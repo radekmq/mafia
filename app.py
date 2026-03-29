@@ -24,11 +24,63 @@ db_game = {
 db_game_selection = None
 
 DEFAULT_TEST_PLAYERS = [
-    {"client_id": f"default-test-player-{index}", "name": f"Test gracz {index}"}
+    {
+        "client_id": f"default-test-player-{index}",
+        "name": f"Test gracz {index}",
+        "seat": index,
+    }
     for index in range(1, 6)
 ]
 
 ALLOWED_BACK_ENDPOINTS = {"lobby", "handle_menu", "index"}
+
+
+def parse_seat(raw_seat):
+    if raw_seat is None or str(raw_seat).strip() == "":
+        raise ValueError("Numer miejsca jest wymagany")
+
+    try:
+        seat = int(str(raw_seat).strip())
+    except (TypeError, ValueError) as exc:
+        raise ValueError("Numer miejsca musi być liczbą całkowitą") from exc
+
+    if seat < 1:
+        raise ValueError("Numer miejsca musi być większy od zera")
+
+    return seat
+
+
+def is_seat_taken(seat, excluded_client_id=None):
+    for existing_client_id, player in db_players.get_all().items():
+        if existing_client_id == excluded_client_id:
+            continue
+        if player.get("seat") == seat:
+            return True
+
+    return False
+
+
+def build_game_status_payload():
+    return {
+        "no_of_players": len(db_players),
+        "game_status": db_game["game_active"],
+        "game_active": db_game["game_active"],
+        "char_presented": db_game["char_presented"],
+    }
+
+
+def remove_player_from_game(client_id):
+    if client_id not in db_players:
+        return False
+
+    clients.pop(client_id, None)
+    db_players.remove(client_id)
+
+    if client_id in db_game["players"]:
+        db_game["players"].remove(client_id)
+
+    db_game["no_of_players"] = len(db_players)
+    return True
 
 
 def seed_default_players_for_admin():
@@ -42,6 +94,7 @@ def seed_default_players_for_admin():
             {
                 "name": default_player["name"],
                 "character": "test",
+                "seat": default_player["seat"],
                 "sid": None,
             },
         )
@@ -99,36 +152,56 @@ def handle_disconnect():
 def index():
     client_id = session.get("client_id")
     if client_id and client_id in db_players:
-        return render_template("index.html", name=db_players[client_id]["name"], character=db_players[client_id]["character"])
+        return render_template(
+            "index.html",
+            name=db_players[client_id]["name"],
+            character=db_players[client_id]["character"],
+            numer_miejsca=db_players[client_id].get("seat", ""),
+        )
     else:
-        return render_template("index.html", name="", character="")
+        return render_template("index.html", name="", character="", numer_miejsca="")
 
 @app.route("/save-player", methods=["POST"])
 def save_player():
     data = request.get_json()
     name = data.get("name")
     character = data.get("character")
+    raw_seat = data.get("numer_miejsca")
     client_id = data.get("clientId") or data.get("client_id")
     socket_sid = data.get("socketSid")
     session["client_id"] = client_id
-    print(f"Save {name=}, {character=}, {client_id=}, {socket_sid=}")
+    is_admin_login = name == "admin" and character == "secret"
+    print(f"Save {name=}, {character=}, {raw_seat=}, {client_id=}, {socket_sid=}")
     
     if client_id:
         if not name or not character:
             return jsonify({"error": "Brak wymaganych danych"}), 400
+
+        seat = None
+        if not is_admin_login:
+            try:
+                seat = parse_seat(raw_seat)
+            except ValueError as exc:
+                return jsonify({"error": str(exc)}), 400
+
+            if is_seat_taken(seat, excluded_client_id=client_id):
+                return jsonify({"error": f"Miejsce numer {seat} jest już zajęte"}), 400
         
-        if name=="admin" and character=="secret":
+        if is_admin_login:
             db_game["admin_id"] = client_id
             seed_default_players_for_admin()
-            socketio.emit("update_game_status", { "no_of_players": len(db_players), "game_status": db_game["game_active"] })
+            db_game["no_of_players"] = len(db_players)
+            socketio.emit("update_game_status", build_game_status_payload())
             
             return redirect(url_for("handle_menu"))
         
         if client_id not in db_players:
-            print(f"Dodaje nowego gracza: {name}, postać: {character}")
-            db_players.add(client_id, { "name" : None, "character" : None, "sid": None} )
-            db_players[client_id]["name"] = name
-            db_players[client_id]["character"] = character
+            print(f"Dodaje nowego gracza: {name}, postać: {character}, seat: {seat}")
+            db_players.add(client_id, { "name" : None, "character" : None, "seat": None, "sid": None} )
+
+        db_players[client_id]["name"] = name
+        db_players[client_id]["character"] = character
+        db_players[client_id]["seat"] = seat
 
         if socket_sid:
             clients[client_id] = socket_sid
@@ -140,7 +213,8 @@ def save_player():
         else:
             print(f"[save_player] Brak aktywnego sid dla client_id={client_id} w chwili zapisu gracza")
         
-        socketio.emit("update_game_status", { "no_of_players": len(db_players), "game_status": db_game["game_active"] })
+        db_game["no_of_players"] = len(db_players)
+        socketio.emit("update_game_status", build_game_status_payload())
         print("Aktualna baza graczy:", db_players._data)
         return redirect(url_for("lobby"))
     else:
@@ -246,15 +320,19 @@ def leave_game():
             print("[leave_game] Brak client_id w sesji!")
             return redirect(url_for("index"))
         
-        if client_id in db_players:
-            db_players.remove(client_id)
-            print(f"[leave_game] Gracz {client_id} usunięty. Pozostali: {db_players.get_all()}")
-        else:
+        if not remove_player_from_game(client_id):
             print(f"[leave_game] Gracza {client_id} nie było w pokoju!")
             return redirect(url_for("index"))
-        
-        if client_id in db_game["players"]:
-            db_game["players"].remove(client_id)
+
+        print(f"[leave_game] Gracz {client_id} usunięty. Pozostali: {db_players.get_all()}")
+
+        if client_id == db_game.get("admin_id"):
+            db_game["admin_id"] = None
+
+        session.pop("client_id", None)
+        session.pop("room", None)
+
+        socketio.emit("update_game_status", build_game_status_payload())
         
         return redirect(url_for("index"))
     

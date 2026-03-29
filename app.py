@@ -28,6 +28,8 @@ DEFAULT_TEST_PLAYERS = [
     for index in range(1, 6)
 ]
 
+ALLOWED_BACK_ENDPOINTS = {"lobby", "handle_menu", "index"}
+
 
 def seed_default_players_for_admin():
     for default_player in DEFAULT_TEST_PLAYERS:
@@ -43,6 +45,19 @@ def seed_default_players_for_admin():
                 "sid": None,
             },
         )
+
+
+def resolve_back_endpoint(default_endpoint="index"):
+    requested_endpoint = request.args.get("back")
+    if requested_endpoint in ALLOWED_BACK_ENDPOINTS:
+        return requested_endpoint
+
+    client_id = session.get("client_id")
+    if client_id in db_players:
+        return "lobby"
+    if client_id == db_game.get("admin_id"):
+        return "handle_menu"
+    return default_endpoint
 
 @socketio.on('connect')
 def handle_connect():
@@ -245,15 +260,28 @@ def leave_game():
     
 @app.route("/postac/<route>")
 def postac(route):
+    back_endpoint = resolve_back_endpoint(default_endpoint="lobby")
+    back_url = url_for(back_endpoint)
+
     for kategoria, postaci in db_characters.items():
         for p in postaci:
             if p["route"] == route:
-                return render_template(f"characters/{route}.html", character=p)
+                return render_template(
+                    f"characters/{route}.html",
+                    character=p,
+                    back_url=back_url,
+                )
     abort(404)
 
 @app.route("/wiki")
 def handle_wiki():
-    return render_template("wiki.html", characters=db_characters)
+    back_endpoint = resolve_back_endpoint(default_endpoint="index")
+    return render_template(
+        "wiki.html",
+        characters=db_characters,
+        back_endpoint=back_endpoint,
+        back_url=url_for(back_endpoint),
+    )
 
 
 def find_character_by_client_id(client_id, db_characters):

@@ -18,8 +18,8 @@
           <td ><p id="no_of_player" style="text-align: center;">{{no_of_player}}</p></td>
         </tr>
       </table>
-      <button type="button" onclick="window.location.href='/wiki'">Wiki z listą postaci</button>
-      <button type="button" onclick="leaveGame()">Opuść grę</button>
+      <button type="button" onclick="window.location.href='{{ url_for("handle_wiki", back="lobby") }}'">Wiki z listą postaci</button>
+      <!-- <button type="button" onclick="leaveGame()">Opuść grę</button> -->
     </div>
 
   <script>

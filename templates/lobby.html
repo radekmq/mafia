@@ -1,0 +1,68 @@
+{% extends "base.html" %}
+
+{% block title %}Tęczowa Mafia – Czekanie na graczy{% endblock %}
+
+{% block content %}
+
+<div class="container">
+    <h3>Oczekiwanie na rozpoczęcie gry!</h3>
+
+    <div style="overflow-x:auto;">
+      <p id="greetings">{{room_status}}</p>
+      <p id="game_status">{{game_status}}</p>
+      <p id="errorMsg" style="color: red; font-weight: bold;"></p>
+      
+      <table>
+        <tr>
+          <td>Aktualna liczba graczy:</td>
+          <td ><p id="no_of_player" style="text-align: center;">{{no_of_player}}</p></td>
+        </tr>
+      </table>
+      <button type="button" onclick="window.location.href='/wiki'">Wiki z listą postaci</button>
+      <button type="button" onclick="leaveGame()">Opuść grę</button>
+    </div>
+
+  <script>
+    function applyGameStatus(data) {
+      if (typeof data.no_of_players !== "undefined") {
+        document.getElementById("no_of_player").textContent = data.no_of_players;
+      }
+
+      if (data.game_status != null) {
+        document.getElementById("game_status").textContent = data.game_status;
+      }
+    }
+
+    if (window.socket) {
+      window.socket.on("update_game_status", data => {
+        applyGameStatus(data);
+      });
+    }
+
+    async function leaveGame() {
+      const errorMsg = document.getElementById("errorMsg");
+      errorMsg.textContent = "";
+    
+      try {
+        const response = await fetch("/leave-game", {
+          method: "POST",
+          headers: { "Content-Type": "application/x-www-form-urlencoded" },
+          body: new URLSearchParams()
+        });
+
+        if (!response.ok) {
+          const res = await response.json();
+          errorMsg.textContent = res.error || "Nie udało się utworzyć pokoju.";
+          return;
+        }
+
+        if (response.redirected) {
+          window.location.href = response.url;
+        }
+      } catch (err) {
+        console.error(err);
+        errorMsg.textContent = "Błąd połączenia z serwerem.";
+      }
+    }
+  </script>
+{% endblock %}

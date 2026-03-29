@@ -1,0 +1,92 @@
+{% extends "base.html" %}
+
+{% block title %}Tęczowa Mafia – Strona główna{% endblock %}
+
+{% block content %}
+  
+
+  <div class="container">
+    <h3>Panel administratora gry!</h3>
+
+    <div style="overflow-x:auto;">
+      <p id="errorMsg" style="color: red; font-weight: bold;"></p>
+      <table>
+        <tr>
+          <td>Aktualna liczba graczy:</td>
+          <td ><p id="liczba_graczy" style="text-align: center;">{{liczba_graczy}}</p></td>
+        </tr>
+        <tr>
+          <td>Postacie wylosowane:</td>
+          <td ><p id="postacie_wylosowane" style="text-align: center;">{{postacie_wylosowane}}</p></td>
+        </tr>
+        <tr>
+          <td colspan="2" onclick="showCharacters()" style="text-align: center;">Losuj postacie</td>
+        </tr>
+        <tr>
+          <td colspan="2" onclick="createGame()" style="text-align: center;">Rozpocznij grę</td>
+        </tr>
+        <tr>
+          <td colspan="2" onclick="window.location.href='/'" style="text-align: center;">Wróć do początku strony</td>
+        </tr>
+      </table>
+    </div>
+
+    <!-- <blockquote>„Księgi są zwierciadłami duszy – im spokojniej je czytasz, tym więcej widzisz.”</blockquote> -->
+  </div>
+
+  <script>
+    socket.on("update_game_status", data => {
+      document.getElementById("liczba_graczy").textContent = data.no_of_players;
+      document.getElementById("postacie_wylosowane").textContent = data.char_presented
+    });
+
+    async function createGame() {
+      const errorMsg = document.getElementById("errorMsg");
+      errorMsg.textContent = "";
+
+      try {
+        const response = await fetch("/create", {
+          method: "POST",
+          headers: { "Content-Type": "application/x-www-form-urlencoded" },
+          body: new URLSearchParams({event: "create"})
+        });
+
+        if (!response.ok) {
+          const res = await response.json();
+          errorMsg.textContent = res.error || "Nie udało się utworzyć pokoju.";
+          return;
+        }
+
+        if (response.redirected) {
+          window.location.href = response.url;
+        }
+      } catch (err) {
+        console.error(err);
+        errorMsg.textContent = "Błąd połączenia z serwerem.";
+      }
+    }
+
+    async function showCharacters() {
+      const errorMsg = document.getElementById("errorMsg");
+      errorMsg.textContent = "";
+      const data = { event: "show" };
+
+      try {
+        const response = await fetch("/create", {
+          method: "POST",
+          headers: { "Content-Type": "application/x-www-form-urlencoded" },
+          body: new URLSearchParams(data)
+        });
+
+        if (!response.ok) {
+          const res = await response.json();
+          errorMsg.textContent = res.error || "Nie udało się rozdzielić postaci.";
+          return;
+        }
+      } catch (err) {
+        console.error(err);
+        errorMsg.textContent = "Błąd połączenia z serwerem.";
+      }
+    }
+  </script>
+{% endblock %}

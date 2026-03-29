@@ -1,0 +1,31 @@
+{% extends "base.html" %}
+
+{% block title %}Lista postaci – Trouble Brewing{% endblock %}
+
+{% block content %}
+<div class="container">
+  <h2>Wikipedia – Lista postaci</h2>
+
+  <table style="width:100%; border-collapse:collapse;">
+    {% for category, chars in characters.items() %}
+      <tr>
+        <td style="vertical-align: top; width: 150px; font-weight: bold; border-bottom: 1px solid #aaa;">
+          {{ category }}
+        </td>
+        <td style="border-bottom: 1px solid #aaa;">
+          {% for c in chars %}
+            <a href="{{ url_for('postac', route=c.route) }}" style="text-decoration: none; color: inherit; margin-right: 20px;">
+            <div style="display: inline-block; text-align: center; margin: 10px;">
+              <img src="{{ url_for('static', filename='images/' ~ c.file) }}" 
+                  alt="{{ c.name }}" 
+                  style="width: 100px; height: auto; border-radius: 8px;"><br>
+              {{ c.name }}
+            </div>
+          </a>
+          {% endfor %}
+        </td>
+      </tr>
+    {% endfor %}
+  </table>
+</div>
+{% endblock %}

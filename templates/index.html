@@ -1,0 +1,72 @@
+{% extends "base.html" %}
+
+{% block title %}Tęczowa Mafia – Strona główna{% endblock %}
+
+{% block content %}
+
+  <div class="container">
+    <h2>Witamy w grze Tęczowa Mafia!</h2>
+    <p>Podaj swoje imię oraz nazwę swojej postacji aby wziąć w grze!</p>
+
+    <div style="overflow-x:auto;">
+      <p id="errorMsg" style="color: red; font-weight: bold;"></p>
+      <table>
+        <tr>
+          <td><label for="name">Imię:</label></td>
+          <td><input type="text" id="name" placeholder="Twoje imię" {% if name %}value="{{ name }}"{% endif %}></td>
+        </tr>
+        <tr>
+          <td><label for="character">Nazwa postaci:</label></td>
+          <td><input type="text" id="character" placeholder="Twoja postać" {% if character %}value="{{ character }}"{% endif %}></td>
+        </tr>
+        <tr>
+          <td colspan="2"><button id="saveBtn">Dołącz do gry</button></td>
+        </tr>
+      </table>
+    </div>
+
+    <!-- <blockquote>„Księgi są zwierciadłami duszy – im spokojniej je czytasz, tym więcej widzisz.”</blockquote> -->
+  </div>
+
+  <script>
+    document.addEventListener("DOMContentLoaded", () => {
+      const inputName = document.getElementById("name");
+      const inputCharacter = document.getElementById("character");
+      const saveBtn = document.getElementById("saveBtn");
+      const errorMsg = document.getElementById("errorMsg");
+
+      saveBtn.addEventListener("click", async () => {
+        const name = inputName.value.trim();
+        const character = inputCharacter.value.trim();
+
+        errorMsg.textContent = "";
+
+        if (!name || !character) {
+          errorMsg.textContent = "Podaj imię i nazwę postaci, zanim zapiszesz!";
+          return;
+        }
+
+        try {
+          const response = await fetch("/save-player", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ name, character, clientId })
+          });
+
+          if (!response.ok) {
+            const res = await response.json().catch(() => ({}));
+            errorMsg.textContent = res.error || "Nie udało się zapisać danych.";
+            return;
+          }
+
+          if (response.redirected) {
+            window.location.href = response.url;
+          }
+        } catch (err) {
+          console.error(err);
+          errorMsg.textContent = "Błąd połączenia z serwerem.";
+        }
+      });
+    });
+  </script>
+{% endblock %}

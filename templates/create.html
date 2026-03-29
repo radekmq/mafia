@@ -1,0 +1,76 @@
+{% extends "base.html" %}
+
+{% block title %}Tęczowa Mafia – Stwórz nowy pokój{% endblock %}
+
+{% block content %}
+
+  <div class="container">
+    <h3>Tworzenie nowej gry!</h3>
+
+    <div style="overflow-x:auto;">
+      <p id="errorMsg" style="color: red; font-weight: bold;"></p>
+      <table>
+        <tr>
+          <td>Nazwa pokoju:</td>
+          <td><input id="room_name" name="room_name" required></td>
+        </tr>
+        <tr>
+          <td>Ilość postaci "Mafia":</td>
+          <td><input type="number" id="role_mafia" name="role_mafia" min="1" required></td>
+        </tr>
+        <tr>
+          <td>Ilość postaci "Obywatel":</td>
+          <td><input type="number" id="role_obywatel" name="role_obywatel" min="1" required></td>
+        </tr>
+        <tr>
+          <td colspan="2" onclick="createGame()" style="text-align: center;">Utwórz grę</td>
+        </tr>
+        <tr>
+          <td colspan="2" onclick="window.location.href='/menu'" style="text-align: center;">Go to menu</td>
+        </tr>
+      </table>
+    </div>
+
+  <script>
+    async function createGame() {
+      const room_name = document.getElementById("room_name").value;
+      const role_mafia = document.getElementById("role_mafia").value;
+      const role_obywatel = document.getElementById("role_obywatel").value;
+      const errorMsg = document.getElementById("errorMsg");
+
+      if (!room_name || !role_mafia || !role_obywatel) {
+          errorMsg.textContent = "Wszystkie pola są obowiązkowe!";
+          return;
+        }
+
+      const data = {
+        room_name: room_name,
+        role_mafia: role_mafia,
+        role_obywatel: role_obywatel,
+      };
+
+      errorMsg.textContent = "";
+
+      try {
+        const response = await fetch("/create", {
+          method: "POST",
+          headers: { "Content-Type": "application/x-www-form-urlencoded" },
+          body: new URLSearchParams(data)
+        });
+
+        if (!response.ok) {
+          const res = await response.json();
+          errorMsg.textContent = res.error || "Nie udało się utworzyć pokoju.";
+          return;
+        }
+
+        if (response.redirected) {
+          window.location.href = response.url;
+        }
+      } catch (err) {
+        console.error(err);
+        errorMsg.textContent = "Błąd połączenia z serwerem.";
+      }
+    }
+  </script>
+{% endblock %}

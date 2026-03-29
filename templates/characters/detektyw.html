@@ -1,0 +1,38 @@
+{% extends "base.html" %}
+
+{% block title %}Tęczowa Mafia – Detektyw{% endblock %}
+
+{% block content %}
+
+<div style="overflow-x:auto;" class="container">
+  <h3>Detektyw</h3>
+
+  <button type="button" onclick="window.location.href='/lobby'">Wróć do poprzedniego okna</button>
+  
+  <table>
+    <tr><td style="text-align: center;">
+      <img style="width: 40%; height: auto;" src="{{ url_for('static', filename='images/detektyw.png') }}">
+    </td></tr>
+    <tr>
+      <td>
+        Na początku wiesz, że 1 z 2 graczy jest konkretnym Minionem.  
+        Detektyw dowiaduje się, że konkretny Minion jest w grze, ale nie kto go gra.
+
+        <ul>
+          <li>Podczas pierwszej nocy Detektyw dowiaduje się, że jeden z dwóch graczy jest konkretnym Minionem.</li>
+          <li>Informację tę poznaje tylko raz i później nie otrzymuje żadnych dodatkowych wskazówek.</li>
+        </ul>
+      </td>
+    </tr>
+  </table>
+
+  <blockquote>Amy jest Baronem, a Julian jest Burmistrzem. Detektyw dowiaduje się, że Amy lub Julian jest Baronem.</blockquote>
+
+  <blockquote>Angelus jest Szpiegiem, a Lewis jest Trucicielem. Detektyw dowiaduje się, że Angelus lub Lewis jest Szpiegiem.</blockquote>
+
+  <blockquote>Brianna jest Samotnikiem, a Marianna jest Demonem. Detektyw dowiaduje się, że Brianna lub Marianna jest Trucicielem.  
+  (Dzieje się tak, ponieważ Samotnik rejestruje się jako Minion – w tym przypadku Truciciel.)</blockquote>
+
+</div>
+
+{% endblock %}

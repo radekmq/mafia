@@ -1,0 +1,52 @@
+{% extends "base.html" %}
+
+{% block title %}Tęczowa Mafia – Strona główna{% endblock %}
+
+{% block content %}
+<div class="container" style="overflow-x:auto;">
+  <table id="player_table" cellspacing="0" cellpadding="8">
+    <tr>
+      <td  style="text-align:center; width:30%;">
+        <a data-key="player_link" href="{{ player_link }}">
+          <img data-key="player_image"
+               style="width: 30%; height: auto; cursor: pointer;"
+               src="{{ player_image }}">
+        </a>
+      </td>
+      <td data-key="player_info" style="width:70%; vertical-align:top;">{{ player_info }}</td>
+    </tr>
+    <tr>
+      <td colspan="2" data-key="player_status">{{ player_status }}</td>
+    </tr>
+  </table>
+</div>
+
+<script>
+  socket.on("update_player_status", data => {
+    console.log("🔄 Otrzymano update_player_status:", data);
+
+    for (const [key, value] of Object.entries(data)) {
+      const el = document.querySelector(`[data-key="${key}"]`);
+      if (!el) continue;
+
+      // obsługa obrazka
+      if (el.tagName === "IMG") {
+        el.src = value;
+      }
+      // obsługa linku
+      else if (el.tagName === "A") {
+        el.href = value;
+      }
+      // obsługa tekstu
+      else {
+        el.textContent = value;
+      }
+
+      // krótka animacja podświetlenia zmienionego elementu
+      el.style.transition = "background-color 0.4s";
+      el.style.backgroundColor = "#fff3cd";
+      setTimeout(() => el.style.backgroundColor = "", 600);
+    }
+  });
+</script>
+{% endblock %}

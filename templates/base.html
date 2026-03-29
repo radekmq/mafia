@@ -1,0 +1,231 @@
+<!DOCTYPE html>
+<html lang="pl">
+<head>
+  <meta charset="UTF-8">
+  <title>{% block title %}{% endblock %}</title>
+  <!-- Import eleganckiej czcionki z Google Fonts -->
+  <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@400;500;600&display=swap" rel="stylesheet">
+
+  <style>
+    body {
+      font-family: "Cormorant Garamond", serif;
+      background-color: #f2e9da; /* beżowo-piaskowe tło */
+      color: #4b3a2a; /* ciepły ciemny brąz */
+      margin: 40px;
+      line-height: 1.8;
+      font-size: 26px; /* większa czcionka */
+    }
+
+    h1, h2, h3 {
+      color: #3a2d1f;
+      text-align: center;
+      letter-spacing: 0.5px;
+    }
+
+    h1 {
+      font-size: 2.4em;
+      margin-bottom: 0.4em;
+    }
+
+    h2 {
+      font-size: 1.8em;
+      margin-top: 1.2em;
+    }
+
+    p {
+      max-width: 850px;
+      margin: 10px auto;
+      text-align: justify;
+    }
+
+    /* Tabela */
+    table {
+      border-collapse: collapse;
+      width: 85%;
+      margin: 25px auto;
+      background-color: #fffdf8;
+      box-shadow: 0 0 5px rgba(0,0,0,0.1);
+      font-size: 1em;
+    }
+
+    th, td {
+      border: 1px solid #d6cbb8;
+      padding: 12px;
+      text-align: left;
+    }
+
+    th {
+      background-color: #f5f1e8;
+      color: #3d2f20;
+      font-weight: 600;
+    }
+
+    tr:nth-child(even) {
+      background-color: #faf8f3;
+    }
+
+    tr:hover {
+      background-color: #efe9dc;
+    }
+
+    /* Linki */
+    a {
+      color: #7b5e35;
+      text-decoration: none;
+      font-weight: 500;
+    }
+
+    a:hover {
+      text-decoration: underline;
+      color: #9a7448;
+    }
+
+    /* Cytaty */
+    blockquote {
+      background: #f8f5ee;
+      border-left: 5px solid #c8b89a;
+      margin: 30px auto;
+      padding: 18px 25px;
+      width: 75%;
+      font-style: italic;
+      color: #5a4630;
+      font-size: 1.1em;
+    }
+
+    /* Kontener */
+    .container {
+      max-width: 1000px;
+      margin: 0 auto;
+      background-color: #fffdf8;
+      padding: 30px;
+      border-radius: 8px;
+      box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+    }
+
+    /* Pola input – większe, stylizowane */
+    input[type="text"], textarea {
+      width: 90%;
+      max-width: 600px;
+      display: block;
+      margin: 20px auto;
+      padding: 14px 18px;
+      font-size: 20px;
+      font-family: "Cormorant Garamond", serif;
+      border: 1px solid #c8b89a;
+      border-radius: 6px;
+      background-color: #fdfaf3;
+      color: #3a2d1f;
+      box-shadow: inset 0 1px 3px rgba(0,0,0,0.1);
+    }
+
+    input[type="text"]:focus, textarea:focus {
+      outline: none;
+      border-color: #b49772;
+      background-color: #fffdf8;
+    }
+
+    /* 🌿 Stylizowany przycisk */
+    button {
+      display: block;
+      margin: 25px auto;
+      padding: 12px 28px;
+      font-size: 20px;
+      font-family: "Cormorant Garamond", serif;
+      color: #3b2a18;
+      background: linear-gradient(180deg, #f4e7c6 0%, #e3d2a8 100%);
+      border: 1px solid #b89d6b;
+      border-radius: 8px;
+      box-shadow: 0 3px 6px rgba(0,0,0,0.15);
+      cursor: pointer;
+      transition: all 0.2s ease-in-out;
+    }
+
+    button:hover {
+      background: linear-gradient(180deg, #f6ebc8 0%, #e9d9af 100%);
+      transform: translateY(-1px);
+      box-shadow: 0 4px 8px rgba(0,0,0,0.2);
+    }
+
+    button:active {
+      background: linear-gradient(180deg, #e8d9b4 0%, #d8c593 100%);
+      transform: translateY(1px);
+      box-shadow: inset 0 2px 4px rgba(0,0,0,0.2);
+    }
+
+    /* Responsywność — dla telefonów */
+    @media (max-width: 600px) {
+      body {
+        margin: 10px;
+        font-size: 19px;
+        line-height: 1.9;
+      }
+
+      .container {
+        padding: 15px;
+      }
+
+      table {
+        width: 100%;
+        font-size: 15px;
+      }
+
+      th, td {
+        padding: 8px;
+      }
+
+      blockquote {
+        width: 95%;
+        padding: 12px 18px;
+        font-size: 1.05em;
+      }
+
+      input[type="text"], textarea {
+        font-size: 19px;
+        padding: 16px;
+        width: 100%;
+      }
+    }
+  </style>
+  <script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
+  <script>
+    function generateUUID() {
+      if (window.crypto && crypto.randomUUID) {
+        return crypto.randomUUID();
+      }
+      return 'xxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, c => {
+        const r = Math.random() * 16 | 0;
+        const v = c === 'x' ? r : (r & 0x3 | 0x8);
+        return v.toString(16);
+      });
+    }
+
+    let clientId = localStorage.getItem("client_id");
+    if (!clientId) {
+      clientId = generateUUID();
+      localStorage.setItem("client_id", clientId);
+    }
+
+    // 👇 inicjalizacja socketu powinna być od razu
+    const socket = io("http://192.168.4.1:5000", {
+      transports: ["websocket", "polling"]
+    });
+
+    socket.on("connect", () => {
+      console.log("Połączono z serwerem:", socket.id);
+      // możesz od razu wysłać client_id, zamiast czekać na prośbę
+      socket.emit("client_id_response", { client_id: clientId });
+    });
+
+    socket.on("redirect_user", data => {
+      window.location.href = data.url;
+    });
+
+    socket.on("disconnect", () => {
+      console.warn("Rozłączono z serwerem");
+    });
+  </script>
+</head>
+<body>
+  {% block content %}{% endblock %}
+</body>
+</html>

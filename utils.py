@@ -79,18 +79,24 @@ def assign_players_to_characters(client_ids, trouble_brewing_setup, db_character
     - Imp dostaje 3 dodatkowych Mieszczan ('druga_postac' = lista 3 nazw).
     - Postacie wybrane dla Impa lub Pijaka nie mogą pojawić się nigdzie indziej.
     """
+    print("\n[assign_players_to_characters] Start losowania")
+    print(f"[assign_players_to_characters] client_ids before shuffle: {client_ids}")
     liczba_graczy = len(client_ids)
+    print(f"[assign_players_to_characters] liczba_graczy={liczba_graczy}")
 
     # Znajdź odpowiedni setup dla liczby graczy
     setup = next((s for s in trouble_brewing_setup if s["gracze"] == liczba_graczy), None)
     if setup is None:
+        print(f"[assign_players_to_characters] Brak setupu dla liczby graczy={liczba_graczy}")
         raise ValueError(f"Brak konfiguracji dla {liczba_graczy} graczy")
+    print(f"[assign_players_to_characters] Wybrany setup: {setup}")
 
     # Zawsze resetuj flagę wyboru przed nowym losowaniem.
     # Bez tego kolejne gry dziedziczą stan poprzedniego losowania.
     for category in db_characters.values():
         for char in category:
             char["wybrany"] = False
+    print("[assign_players_to_characters] Zresetowano flagi 'wybrany' dla wszystkich postaci")
 
     # Utwórz nową bazę danych dla bieżącej gry
     new_db_characters = {"Mieszkańcy": [], "Outsiderzy": [], "Minionki": [], "Demon": []}
@@ -99,10 +105,20 @@ def assign_players_to_characters(client_ids, trouble_brewing_setup, db_character
     for category in ["Mieszkańcy", "Outsiderzy", "Minionki", "Demon"]:
         available = [c for c in db_characters[category] if not c.get("wybrany", False)]
         count = setup[category]
+        print(
+            f"[assign_players_to_characters] Kategoria={category}, "
+            f"potrzeba={count}, dostepne={len(available)}, "
+            f"nazwy={[c['name'] for c in available]}"
+        )
         if count > len(available):
+            print(f"[assign_players_to_characters] Za mało postaci w kategorii={category}")
             raise ValueError(f"Za mało dostępnych postaci w kategorii {category}")
 
         selected = random.sample(available, count)
+        print(
+            f"[assign_players_to_characters] Wylosowane w kategorii={category}: "
+            f"{[c['name'] for c in selected]}"
+        )
 
         # Oznacz w oryginalnej bazie, że zostały wybrane
         for c in selected:
@@ -122,10 +138,19 @@ def assign_players_to_characters(client_ids, trouble_brewing_setup, db_character
         + new_db_characters["Minionki"]
         + new_db_characters["Demon"]
     )
+    print(
+        "[assign_players_to_characters] Wszystkie wylosowane postacie przed shuffle: "
+        f"{[c['name'] for c in all_characters]}"
+    )
 
     # Przetasuj graczy i postacie
     random.shuffle(client_ids)
     random.shuffle(all_characters)
+    print(f"[assign_players_to_characters] client_ids after shuffle: {client_ids}")
+    print(
+        "[assign_players_to_characters] all_characters after shuffle: "
+        f"{[c['name'] for c in all_characters]}"
+    )
 
     drunk_extra_pending = None
     imp_extra_pending = None
@@ -133,16 +158,27 @@ def assign_players_to_characters(client_ids, trouble_brewing_setup, db_character
     # Przydziel postacie graczom
     for client_id, char in zip(client_ids, all_characters):
         char["client_id"] = client_id
+        print(
+            f"[assign_players_to_characters] Przydzielono postac={char['name']} "
+            f"do client_id={client_id}"
+        )
         if char["name"] == "Pijak":
             drunk_extra_pending = client_id
         elif char["name"] == "Imp":
             imp_extra_pending = client_id
+
+    print(f"[assign_players_to_characters] drunk_extra_pending={drunk_extra_pending}")
+    print(f"[assign_players_to_characters] imp_extra_pending={imp_extra_pending}")
 
     # ======= Pijak =======
     if drunk_extra_pending:
         remaining_townsfolk = [
             c for c in db_characters["Mieszkańcy"] if not c.get("wybrany", False)
         ]
+        print(
+            "[assign_players_to_characters] Dostepni Mieszkancy dla Pijaka: "
+            f"{[c['name'] for c in remaining_townsfolk]}"
+        )
         if remaining_townsfolk:
             extra = random.choice(remaining_townsfolk)
             extra["wybrany"] = True  # oznacz w oryginalnej bazie, by już nie był dostępny
@@ -150,20 +186,34 @@ def assign_players_to_characters(client_ids, trouble_brewing_setup, db_character
             extra_copy["client_id"] = drunk_extra_pending
             extra_copy["numer_siedzenia"] = None
             new_db_characters["Mieszkańcy"].append(extra_copy)
+            print(
+                f"[assign_players_to_characters] Pijak client_id={drunk_extra_pending} "
+                f"otrzymal dodatkowa postac={extra_copy['name']}"
+            )
 
             # dopisz w rekordzie Pijaka jego dodatkową postać (lista)
             for category in new_db_characters.values():
                 for c in category:
                     if c["name"] == "Pijak" and c["client_id"] == drunk_extra_pending:
                         c["druga_postac"] = [extra_copy["name"]]
+        else:
+            print("[assign_players_to_characters] Brak dodatkowej postaci dla Pijaka")
 
     # ======= Imp =======
     if imp_extra_pending:
         remaining_townsfolk = [
             c for c in db_characters["Mieszkańcy"] if not c.get("wybrany", False)
         ]
+        print(
+            "[assign_players_to_characters] Dostepni Mieszkancy dla Impa: "
+            f"{[c['name'] for c in remaining_townsfolk]}"
+        )
         if len(remaining_townsfolk) >= 3:
             extra_three = random.sample(remaining_townsfolk, 3)
+            print(
+                f"[assign_players_to_characters] Imp client_id={imp_extra_pending} "
+                f"otrzymal dodatkowe postacie={[e['name'] for e in extra_three]}"
+            )
             # oznacz te postacie jako zużyte
             for e in extra_three:
                 e["wybrany"] = True
@@ -179,6 +229,8 @@ def assign_players_to_characters(client_ids, trouble_brewing_setup, db_character
                 for c in category:
                     if c["name"] == "Imp" and c["client_id"] == imp_extra_pending:
                         c["druga_postac"] = [e["name"] for e in extra_three]
+        else:
+            print("[assign_players_to_characters] Brak wystarczajacej liczby dodatkowych postaci dla Impa")
 
     # Debug – wypisz przydział
     print("📜 Wynik losowania postaci (nowa baza):")

@@ -205,8 +205,10 @@
       localStorage.setItem("client_id", clientId);
     }
 
-    // 👇 inicjalizacja socketu powinna być od razu
-    const socket = io("http://192.168.4.1:5000", {
+    const socketUrl = window.location.origin;
+
+    // Lacz sie z tym samym adresem, z ktorego zostala otwarta aplikacja.
+    const socket = io(socketUrl, {
       transports: ["websocket", "polling"]
     });
 

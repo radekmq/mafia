@@ -23,6 +23,27 @@ db_game = {
 }
 db_game_selection = None
 
+DEFAULT_TEST_PLAYERS = [
+    {"client_id": f"default-test-player-{index}", "name": f"Test gracz {index}"}
+    for index in range(1, 6)
+]
+
+
+def seed_default_players_for_admin():
+    for default_player in DEFAULT_TEST_PLAYERS:
+        client_id = default_player["client_id"]
+        if client_id in db_players:
+            continue
+
+        db_players.add(
+            client_id,
+            {
+                "name": default_player["name"],
+                "character": "test",
+                "sid": None,
+            },
+        )
+
 @socketio.on('connect')
 def handle_connect():
     sid = request.sid
@@ -67,6 +88,8 @@ def save_player():
         
         if name=="admin" and character=="secret":
             db_game["admin_id"] = client_id
+            seed_default_players_for_admin()
+            socketio.emit("update_game_status", { "no_of_players": len(db_players), "game_status": db_game["game_active"] })
             
             return redirect(url_for("handle_menu"))
         
@@ -130,6 +153,7 @@ def create():
                                                 "char_presented": db_game["char_presented"],
                                                 })
         elif event == "show":
+            print(f"[create] Otrzymano żądanie losowania postaci od client_id={client_id}")
             if len(db_players) < 5:
                 return jsonify({"error": "Too few players. Minimum is 5"}), 404
 
@@ -201,6 +225,8 @@ def redirect_players_to_character_pages():
 
     for client_id in db_players.get_all_client_ids():
         player = db_players[client_id]
+        print(f"[redirect_players_to_character_pages] Przetwarzam client_id={client_id}, player={player}")
+        print(f"[redirect_players_to_character_pages] player.name={player.get('name')}, player.character={player.get('character')}, player.sid={player.get('sid')}")
         sid = player.get("sid")
 
         if not sid:

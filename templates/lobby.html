@@ -31,6 +31,10 @@
       if (data.game_status != null) {
         document.getElementById("game_status").textContent = data.game_status;
       }
+
+      if (data.char_presented === true) {
+        window.location.href = "/player_page";
+      }
     }
 
     if (window.socket) {
@@ -38,6 +42,27 @@
         applyGameStatus(data);
       });
     }
+
+    async function pollGameStatus() {
+      try {
+        const response = await fetch("/game-status", {
+          method: "GET",
+          cache: "no-store"
+        });
+
+        if (!response.ok) {
+          return;
+        }
+
+        const data = await response.json();
+        applyGameStatus(data);
+      } catch (err) {
+        console.warn("Polling game-status nie powiodl sie:", err);
+      }
+    }
+
+    pollGameStatus();
+    setInterval(pollGameStatus, 1500);
 
     async function leaveGame() {
       const errorMsg = document.getElementById("errorMsg");

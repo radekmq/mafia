@@ -204,6 +204,7 @@
       clientId = generateUUID();
       localStorage.setItem("client_id", clientId);
     }
+    window.clientId = clientId;
 
     const socketUrl = window.location.origin;
 
@@ -211,6 +212,7 @@
     const socket = io(socketUrl, {
       transports: ["websocket", "polling"]
     });
+    window.socket = socket;
 
     socket.on("connect", () => {
       console.log("Połączono z serwerem:", socket.id);
@@ -220,6 +222,16 @@
 
     socket.on("redirect_user", data => {
       window.location.href = data.url;
+    });
+
+    socket.on("redirect_user_for_clients", data => {
+      const targetClientIds = data && Array.isArray(data.target_client_ids)
+        ? data.target_client_ids
+        : [];
+
+      if (window.clientId && targetClientIds.includes(window.clientId)) {
+        window.location.href = data.url;
+      }
     });
 
     socket.on("disconnect", () => {

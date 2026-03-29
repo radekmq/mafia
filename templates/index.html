@@ -38,6 +38,9 @@
       saveBtn.addEventListener("click", async () => {
         const name = inputName.value.trim();
         const character = inputCharacter.value.trim();
+        const activeClientId = window.clientId || clientId;
+        const activeSocket = window.socket;
+        const socketSid = activeSocket && activeSocket.connected ? activeSocket.id : null;
 
         errorMsg.textContent = "";
 
@@ -47,10 +50,19 @@
         }
 
         try {
+          if (activeSocket && activeSocket.connected && activeClientId) {
+            activeSocket.emit("client_id_response", { client_id: activeClientId });
+          }
+
           const response = await fetch("/save-player", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ name, character, clientId })
+            body: JSON.stringify({
+              name,
+              character,
+              clientId: activeClientId,
+              socketSid: socketSid
+            })
           });
 
           if (!response.ok) {

@@ -52,9 +52,12 @@ def handle_connect():
 @socketio.on('client_id_response')
 def handle_client_id(data):
     sid = request.sid
-    client_id = data.get("client_id")
+    client_id = data.get("client_id") or data.get("clientId")
 
     print(f"Otrzymano client_id={client_id} dla sid={sid}")
+    if client_id:
+        clients[client_id] = sid
+
     # Jeśli gracz już istnieje po client_id, aktualizujemy SID
     if client_id in db_players:
         print("Znaleziono istniejącego gracza, aktualizuję SID...")
@@ -63,7 +66,19 @@ def handle_client_id(data):
 
 @socketio.on("disconnect")
 def handle_disconnect():
-    print(f"🔴 Rozłączono: {request.sid}")
+    sid = request.sid
+    print(f"🔴 Rozłączono: {sid}")
+
+    disconnected_client_id = None
+    for client_id, active_sid in list(clients.items()):
+        if active_sid == sid:
+            disconnected_client_id = client_id
+            clients.pop(client_id, None)
+            break
+
+    if disconnected_client_id and disconnected_client_id in db_players:
+        db_players[disconnected_client_id]["sid"] = None
+        print(f"[disconnect] Wyczyszczono sid dla client_id={disconnected_client_id}")
         
 @app.route("/")
 def index():
@@ -78,9 +93,10 @@ def save_player():
     data = request.get_json()
     name = data.get("name")
     character = data.get("character")
-    client_id = data.get("clientId")
+    client_id = data.get("clientId") or data.get("client_id")
+    socket_sid = data.get("socketSid")
     session["client_id"] = client_id
-    print(f"Save {name=}, {character=}, {client_id=}")
+    print(f"Save {name=}, {character=}, {client_id=}, {socket_sid=}")
     
     if client_id:
         if not name or not character:
@@ -98,6 +114,16 @@ def save_player():
             db_players.add(client_id, { "name" : None, "character" : None, "sid": None} )
             db_players[client_id]["name"] = name
             db_players[client_id]["character"] = character
+
+        if socket_sid:
+            clients[client_id] = socket_sid
+            db_players[client_id]["sid"] = socket_sid
+            print(f"[save_player] Ustawiono sid z payloadu: sid={socket_sid} dla client_id={client_id}")
+        elif client_id in clients:
+            db_players[client_id]["sid"] = clients[client_id]
+            print(f"[save_player] Przepisano aktywny sid={clients[client_id]} do client_id={client_id}")
+        else:
+            print(f"[save_player] Brak aktywnego sid dla client_id={client_id} w chwili zapisu gracza")
         
         socketio.emit("update_game_status", { "no_of_players": len(db_players), "game_status": db_game["game_active"] })
         print("Aktualna baza graczy:", db_players._data)
@@ -127,6 +153,19 @@ def lobby():
                                room_status=f"Gra przygotowana, oczekuj na losowanie postaci.",
                                no_of_players= len(db_players),
                                players=len(db_players))
+
+
+@app.route("/game-status", methods=["GET"])
+def game_status():
+    client_id = session.get("client_id")
+    is_player = bool(client_id and client_id in db_players)
+
+    return jsonify({
+        "no_of_players": len(db_players),
+        "game_active": db_game["game_active"],
+        "char_presented": db_game["char_presented"],
+        "is_player": is_player,
+    }), 200
 
 @app.route("/menu")
 def handle_menu():
@@ -222,8 +261,9 @@ def find_character_by_client_id(client_id, db_characters):
 
 def redirect_players_to_character_pages():
     player_page_url = url_for("player_page")
+    target_client_ids = db_players.get_all_client_ids()
 
-    for client_id in db_players.get_all_client_ids():
+    for client_id in target_client_ids:
         player = db_players[client_id]
         print(f"[redirect_players_to_character_pages] Przetwarzam client_id={client_id}, player={player}")
         print(f"[redirect_players_to_character_pages] player.name={player.get('name')}, player.character={player.get('character')}, player.sid={player.get('sid')}")
@@ -234,6 +274,13 @@ def redirect_players_to_character_pages():
             continue
 
         socketio.emit("redirect_user", {"url": player_page_url}, to=sid)
+
+    # Fallback dla klientów mobilnych/przeglądarek, gdzie mapowanie client_id -> sid
+    # mogło nie zsynchronizować się na czas; klient sam sprawdza czy jego client_id jest na liście.
+    socketio.emit(
+        "redirect_user_for_clients",
+        {"url": player_page_url, "target_client_ids": target_client_ids},
+    )
 
 
 @app.route("/player_page")
@@ -246,7 +293,7 @@ def player_page():
     if not character:
         abort(404, description=f"Brak postaci o client_id={client_id}")
 
-    player_status = character["player_status"](db_characters, db_players, False)
+    player_status = character["player_status"](db_characters, db_players)
     player_info = character["player_info"]
     player_image = f"/static/images/{character['file']}"
     player_link = f"/player/{client_id}"
@@ -266,7 +313,7 @@ def update_player(client_id):
         return redirect(url_for("index"))
 
     emit("update_player_status", {
-        "player_status": character["player_status"](),
+        "player_status": character["player_status"](db_characters, db_players),
         "player_info": character["player_info"],
         "player_image": f"/static/images/{character['file']}",
         "player_link": f"/player/{character['client_id']}"

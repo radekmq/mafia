@@ -1,0 +1,40 @@
+{% extends "base.html" %}
+
+{% block title %}Tęczowa Mafia – Jasnowidz{% endblock %}
+
+{% block content %}
+
+<div style="overflow-x:auto;" class="container">
+  <h3>Jasnowidz</h3>
+
+  <button type="button" onclick="window.location.href='/lobby'">Wróć do poprzedniego okna</button>
+  
+  <table>
+    <tr><td style="text-align: center;">
+      <img style="width: 40%; height: auto;" src="{{ url_for('static', filename='images/jasnowidz.png') }}">
+    </td></tr>
+    <tr>
+      <td>
+        Każdej nocy wybierz 2 graczy: dowiadujesz się, czy którykolwiek z nich jest Demonem. Istnieje dobry gracz, który dla ciebie jest wykrywany jako Demon.
+        Jasnowidz wykrywa, kto jest Demonem, ale czasami błędnie uznaje dobrych graczy za Demonów.
+
+        <ul>
+          <li>Każdej nocy Jasnowidz wybiera dwóch graczy i dowiaduje się, czy przynajmniej jeden z nich jest Demonem. Nie dowiaduje się, który z nich jest Demonem — tylko że jeden z nich nim jest. Jeśli żaden z nich nie jest Demonem, otrzymuje taką informację.</li>
+          <li>Niestety, jeden z graczy — zwany Czerwonym Śledziem (Red Herring) — będzie wykrywany jako Demon przez Jasnowidza, jeśli zostanie wybrany. Czerwony Śledź jest tym samym graczem przez całą grę. Może to być dowolny dobry gracz, nawet sam Jasnowidz, a Jasnowidz nie wie, kto to jest.</li>
+          <li>Jasnowidz może wybrać dowolnych dwóch graczy — żywych lub martwych, a nawet samego siebie. Jeśli wybierze martwego Demona, nadal otrzymuje potwierdzenie (sygnał), że wśród wybranych jest Demon.</li>
+        </ul>
+      </td>
+    </tr>
+  </table>
+
+  <blockquote>Jasnowidz wybiera Mnicha i Grabiarza i otrzymuje odpowiedź „nie”.</blockquote>
+
+  <blockquote>Jasnowidz wybiera Impa i Empatę i otrzymuje odpowiedź „tak”.</blockquote>
+
+  <blockquote>Jasnowidz wybiera żywego Lokaja i martwego Impa i otrzymuje odpowiedź „tak”.</blockquote>
+  
+  <blockquote>Jasnowidz wybiera samego siebie oraz Świętego. Święty jest Czerwonym Śledziem. Jasnowidz otrzymuje odpowiedź „tak”.</blockquote>
+
+</div>
+
+{% endblock %}

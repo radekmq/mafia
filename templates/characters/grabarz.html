@@ -1,0 +1,40 @@
+{% extends "base.html" %}
+
+{% block title %}Tęczowa Mafia – Grabarz{% endblock %}
+
+{% block content %}
+
+<div style="overflow-x:auto;" class="container">
+  <h3>Grabarz</h3>
+
+  <button type="button" onclick="window.location.href='/lobby'">Wróć do poprzedniego okna</button>
+  
+  <table>
+    <tr><td style="text-align: center;">
+      <img style="width: 40%; height: auto;" src="{{ url_for('static', filename='images/grabarz.png') }}">
+    </td></tr>
+    <tr>
+      <td>
+        „Każdej nocy dowiadujesz się, jaka postać została dziś stracona.”
+
+        <ul>
+          <li>Gracz musi umrzeć w wyniku egzekucji, aby Grabarz mógł dowiedzieć się, kim był. Zgony w ciągu dnia z innych powodów, takich jak zabicie gracza przez Rewolwerowca (Gunslinger) lub wygnanie Wędrowca (Traveller), nie są brane pod uwagę.</li>
+          <li>Grabarz uzyskuje tę informację po każdej nocy z wyjątkiem pierwszej, ponieważ wcześniej nie było jeszcze żadnych egzekucji.</li>
+          <li>Jeśli nikt dziś nie zginął, Grabarz nie otrzymuje żadnej informacji.</li>
+          <li>Jeśli Pijak (Drunk) zostanie stracony, Grabiarzowi pokazywany jest żeton postaci Pijaka, a nie żeton Mieszczanina (Townsfolk), za którego uważał się gracz będący Pijakiem.</li>
+        </ul>
+      </td>
+    </tr>
+  </table>
+
+  <blockquote>Burmistrz zostaje dziś stracony. Tej nocy Grabiarzowi pokazuje się żeton Burmistrza.</blockquote>
+
+  <blockquote>Pijak, który myśli, że jest Dziewicą, zostaje dziś stracony. W nocy Grabiarzowi pokazuje się żeton Pijaka, ponieważ Grabiarz poznaje prawdziwą postać gracza, a nie tę, za którą się uważa.</blockquote>
+
+  <blockquote>Szpieg zostaje stracony. Dwóch Wędrowców zostaje wygnanych. Tej nocy Grabiarzowi pokazuje się żeton Lokaja, ponieważ Szpieg jest wykrywany jako Lokaj, a wygnania nie są egzekucjami.</blockquote>
+  
+  <blockquote>Nikt nie został dziś stracony. Po tej nocy Grabiarz nie otrzymuje żadnej informacji.</blockquote>
+
+</div>
+
+{% endblock %}

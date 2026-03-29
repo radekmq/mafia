@@ -1,6 +1,8 @@
 import random
 import copy
 
+test_enabled = True
+
 class Database:
     def __init__(self):
         # _data: mapowanie ID (client_id) -> rekord
@@ -68,7 +70,7 @@ class Database:
 import random
 import copy
 
-def assign_players_to_characters(client_ids, trouble_brewing_setup, db_characters):
+def assign_players_to_characters(client_ids, trouble_brewing_setup, db_characters, players_db=None):
     """
     Tworzy nową bazę postaci dla gry bez modyfikowania oryginalnej bazy db_characters,
     poza oznaczeniem które postacie zostały wybrane (pole 'wybrany': True/False).
@@ -83,6 +85,17 @@ def assign_players_to_characters(client_ids, trouble_brewing_setup, db_character
     print(f"[assign_players_to_characters] client_ids before shuffle: {client_ids}")
     liczba_graczy = len(client_ids)
     print(f"[assign_players_to_characters] liczba_graczy={liczba_graczy}")
+
+    forced_praczka_client_id = None
+    if test_enabled and players_db:
+        for player_client_id, player in players_db.items():
+            if player.get("name") == "RadekP":
+                forced_praczka_client_id = player_client_id
+                break
+        print(
+            f"[assign_players_to_characters] TEST MODE: forced_praczka_client_id="
+            f"{forced_praczka_client_id}"
+        )
 
     # Znajdź odpowiedni setup dla liczby graczy
     setup = next((s for s in trouble_brewing_setup if s["gracze"] == liczba_graczy), None)
@@ -115,6 +128,18 @@ def assign_players_to_characters(client_ids, trouble_brewing_setup, db_character
             raise ValueError(f"Za mało dostępnych postaci w kategorii {category}")
 
         selected = random.sample(available, count)
+
+        if category == "Mieszkańcy" and forced_praczka_client_id and count > 0:
+            praczka = next((c for c in available if c.get("name") == "Praczka"), None)
+            if praczka and praczka not in selected:
+                replace_idx = random.randrange(len(selected))
+                replaced = selected[replace_idx]
+                selected[replace_idx] = praczka
+                print(
+                    "[assign_players_to_characters] TEST MODE: wymuszono Praczkę "
+                    f"(zamiana {replaced['name']} -> Praczka)"
+                )
+
         print(
             f"[assign_players_to_characters] Wylosowane w kategorii={category}: "
             f"{[c['name'] for c in selected]}"
@@ -146,6 +171,25 @@ def assign_players_to_characters(client_ids, trouble_brewing_setup, db_character
     # Przetasuj graczy i postacie
     random.shuffle(client_ids)
     random.shuffle(all_characters)
+
+    if forced_praczka_client_id and forced_praczka_client_id in client_ids:
+        forced_idx = client_ids.index(forced_praczka_client_id)
+        praczka_idx = next(
+            (idx for idx, char in enumerate(all_characters) if char.get("name") == "Praczka"),
+            None,
+        )
+        if praczka_idx is not None:
+            all_characters[forced_idx], all_characters[praczka_idx] = (
+                all_characters[praczka_idx],
+                all_characters[forced_idx],
+            )
+            print(
+                "[assign_players_to_characters] TEST MODE: przypisano Praczkę "
+                f"do client_id={forced_praczka_client_id}"
+            )
+        else:
+            print("[assign_players_to_characters] TEST MODE: Praczka nie została znaleziona")
+
     print(f"[assign_players_to_characters] client_ids after shuffle: {client_ids}")
     print(
         "[assign_players_to_characters] all_characters after shuffle: "
@@ -263,14 +307,27 @@ def fun_praczka(characters, players, drunk=False):
     print(characters)
     all_chars = [c for chars in characters.values() for c in chars]
     mieszkancy = characters.get("Mieszkańcy", [])
+    assigned_chars = [c for c in all_chars if c.get("client_id") in players]
+    assigned_mieszkancy = [c for c in mieszkancy if c.get("client_id") in players]
 
-    if not mieszkancy or len(all_chars) < 2:
+    if not assigned_mieszkancy or len(assigned_chars) < 2:
         return "Brak wystarczającej liczby postaci do losowania."
+
+    def safe_player_name(client_id):
+        if not client_id or client_id not in players:
+            return "Nieznany"
+        try:
+            return players[client_id].get("name", "Nieznany")
+        except KeyError:
+            return "Nieznany"
 
     if drunk:
         # --- Tryb "Pijaka" ---
-        mieszkaniec = random.choice(mieszkancy)
-        losowi_gracze = random.sample(list(players.values()), 2)
+        if len(players) < 2:
+            return "Brak wystarczającej liczby graczy do losowania."
+
+        mieszkaniec = random.choice(assigned_mieszkancy)
+        losowi_gracze = random.sample(list(players.get_all().values()), 2)
         name1, name2 = losowi_gracze[0]["name"], losowi_gracze[1]["name"]
 
         tekst = (
@@ -280,8 +337,17 @@ def fun_praczka(characters, players, drunk=False):
 
     else:
         # --- Tryb normalny ---
-        mieszkaniec = random.choice(mieszkancy)
-        druga_postac = random.choice([c for c in all_chars if c != mieszkaniec])
+        mieszkaniec = random.choice(assigned_mieszkancy)
+        mieszkaniec_client_id = mieszkaniec.get("client_id")
+        kandydaci = [
+            c
+            for c in assigned_chars
+            if c.get("client_id") and c.get("client_id") != mieszkaniec_client_id
+        ]
+        if not kandydaci:
+            return "Brak wystarczającej liczby różnych graczy do losowania."
+
+        druga_postac = random.choice(kandydaci)
 
         # Zapisz drugą postać (lista, jak wymagano)
         mieszkaniec["druga_postac"] = [mieszkaniec["name"], druga_postac["name"]]
@@ -289,11 +355,8 @@ def fun_praczka(characters, players, drunk=False):
         # Pobierz imiona graczy
         print(mieszkaniec.get("client_id"))
         print(druga_postac.get("client_id"))
-        player1 = players[mieszkaniec.get("client_id")]
-        player2 = players[druga_postac.get("client_id")]
-
-        name1 = player1["name"] if player1 else "Nieznany"
-        name2 = player2["name"] if player2 else "Nieznany"
+        name1 = safe_player_name(mieszkaniec.get("client_id"))
+        name2 = safe_player_name(druga_postac.get("client_id"))
 
         # Losowa kolejność imion
         names = [name1, name2]
@@ -309,11 +372,137 @@ def fun_praczka(characters, players, drunk=False):
     return tekst
 
 
-def fun_bibliotekarka(characters, players):
-    return "Na razie nic."
+def fun_bibliotekarka(characters, players, drunk=False):
+    """
+    Funkcja dla postaci 'Bibliotekarka'.
+    Jeśli drunk=False:
+        - gdy Outsider jest w grze: wskazuje 2 graczy, z których jeden ma konkretną postać Outsidera
+        - gdy brak Outsiderów: informuje, że żaden Outsider nie jest w grze
+    Jeśli drunk=True:
+        - generuje losową informację o 2 graczach i losowym Outsiderze
+    """
+
+    all_chars = [c for chars in characters.values() for c in chars]
+    outsiderzy = characters.get("Outsiderzy", [])
+    assigned_chars = [c for c in all_chars if c.get("client_id") in players]
+    assigned_outsiderzy = [c for c in outsiderzy if c.get("client_id") in players]
+
+    if len(players) < 2:
+        return "Brak wystarczającej liczby graczy do losowania."
+
+    def safe_player_name(client_id):
+        if not client_id or client_id not in players:
+            return "Nieznany"
+        try:
+            return players[client_id].get("name", "Nieznany")
+        except KeyError:
+            return "Nieznany"
+
+    if drunk:
+        wszyscy_gracze = list(players.get_all().values())
+        losowi_gracze = random.sample(wszyscy_gracze, 2)
+        name1, name2 = losowi_gracze[0]["name"], losowi_gracze[1]["name"]
+
+        outsider_name = "Outsider"
+        if outsiderzy:
+            outsider_name = random.choice(outsiderzy).get("name", "Outsider")
+
+        tekst = (
+            f"Tylko jeden z graczy: {name1} oraz {name2} "
+            f"ma postać: {outsider_name}"
+        )
+
+    else:
+        if assigned_outsiderzy:
+            outsider = random.choice(assigned_outsiderzy)
+            outsider_client_id = outsider.get("client_id")
+            kandydaci = [
+                c
+                for c in assigned_chars
+                if c.get("client_id") and c.get("client_id") != outsider_client_id
+            ]
+            if not kandydaci:
+                return "Brak wystarczającej liczby różnych graczy do losowania."
+
+            druga_postac = random.choice(kandydaci)
+
+            outsider["druga_postac"] = [outsider["name"], druga_postac["name"]]
+
+            name1 = safe_player_name(outsider_client_id)
+            name2 = safe_player_name(druga_postac.get("client_id"))
+
+            names = [name1, name2]
+            random.shuffle(names)
+
+            tekst = (
+                f"Tylko jeden z graczy: {names[0]} oraz {names[1]} "
+                f"ma postać: {outsider['name']}"
+            )
+        else:
+            wszyscy_gracze = list(players.get_all().values())
+            losowi_gracze = random.sample(wszyscy_gracze, 2)
+            name1, name2 = losowi_gracze[0]["name"], losowi_gracze[1]["name"]
+
+            tekst = (
+                f"Żaden Outsider nie jest w grze. "
+                f"Przykładowi gracze: {name1} oraz {name2}."
+            )
+
+    return tekst
 
 def fun_detektyw(characters, players):
-    return "Na razie nic."
+    """
+    Funkcja dla postaci 'Detektyw'.
+    Informuje, że 1 z 2 graczy ma konkretną postać Miniona.
+    """
+
+    all_chars = [c for chars in characters.values() for c in chars]
+    minionki = characters.get("Minionki", [])
+    assigned_chars = [c for c in all_chars if c.get("client_id") in players]
+    assigned_minionki = [c for c in minionki if c.get("client_id") in players]
+
+    if len(players) < 2:
+        return "Brak wystarczającej liczby graczy do losowania."
+
+    def safe_player_name(client_id):
+        if not client_id or client_id not in players:
+            return "Nieznany"
+        try:
+            return players[client_id].get("name", "Nieznany")
+        except KeyError:
+            return "Nieznany"
+
+    if assigned_minionki:
+        minion = random.choice(assigned_minionki)
+        minion_client_id = minion.get("client_id")
+        kandydaci = [
+            c
+            for c in assigned_chars
+            if c.get("client_id") and c.get("client_id") != minion_client_id
+        ]
+        if not kandydaci:
+            return "Brak wystarczającej liczby różnych graczy do losowania."
+
+        druga_postac = random.choice(kandydaci)
+        minion["druga_postac"] = [minion["name"], druga_postac["name"]]
+
+        name1 = safe_player_name(minion_client_id)
+        name2 = safe_player_name(druga_postac.get("client_id"))
+        names = [name1, name2]
+        random.shuffle(names)
+
+        return (
+            f"Tylko jeden z graczy: {names[0]} oraz {names[1]} "
+            f"ma postać: {minion['name']}"
+        )
+
+    wszyscy_gracze = list(players.get_all().values())
+    losowi_gracze = random.sample(wszyscy_gracze, 2)
+    name1, name2 = losowi_gracze[0]["name"], losowi_gracze[1]["name"]
+    return (
+        f"Żaden Minion nie jest w grze. "
+        f"Przykładowi gracze: {name1} oraz {name2}."
+    )
 
 def fun_kucharz(characters, players):
     return "Na razie nic."
@@ -321,10 +510,10 @@ def fun_kucharz(characters, players):
 def fun_empata(characters, players):
     return "Na razie nic."
 
-def fun_wrozka(characters, players):
+def fun_jasnowidz(characters, players):
     return "Na razie nic."
 
-def fun_kantor(characters, players):
+def fun_grabarz(characters, players):
     return "Na razie nic."
 
 def fun_mnich(characters, players):

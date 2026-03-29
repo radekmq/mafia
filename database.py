@@ -4,8 +4,8 @@ from utils import (
     fun_detektyw,
     fun_kucharz,
     fun_empata,
-    fun_wrozka,
-    fun_kantor,
+    fun_jasnowidz,
+    fun_grabarz,
     fun_mnich,
     fun_krukopiek,
     fun_dziewica,
@@ -32,14 +32,35 @@ db_characters = {
             "file": "praczka.png", 
             "route": "praczka", 
             "player_status": fun_praczka, 
-            "player_info": "Na początku wiesz, że 1 z 2 graczy jest konkretnym mieszczaninem.<br/>Praczka dowiaduje się, że konkretny mieszczanin jest w grze, ale nie kto go gra."
+            "player_info": "Na początku wiesz, że 1 z 2 graczy jest konkretnym mieszczaninem.\nPraczka dowiaduje się, że konkretny mieszczanin jest w grze, ale nie kto go gra."
         },
-        {"client_id": None, "name": "Bibliotekarka", "file": "bibliotekarka.png", "route": "bibliotekarka", "player_status": fun_bibliotekarka, "player_info": "TBD"},
-        {"client_id": None, "name": "Detektyw", "file": "detektyw.png", "route": "detektyw", "player_status": fun_detektyw, "player_info": "TBD"},
-        {"client_id": None, "name": "Kucharz", "file": "kucharz.png", "route": "kucharz", "player_status": fun_kucharz, "player_info": "TBD"},
+        {
+            "client_id": None, 
+            "name": "Bibliotekarka", 
+            "file": "bibliotekarka.png", 
+            "route": "bibliotekarka", 
+            "player_status": fun_bibliotekarka, 
+            "player_info": "Na początku wiesz, że 1 z 2 graczy jest konkretnym Outsiderem (lub że żaden nie jest w grze). Bibliotekarka dowiaduje się, że konkretny Outsider jest w grze, ale nie kto go gra."
+        },
+        {
+            "client_id": None, 
+            "name": "Detektyw", 
+            "file": "detektyw.png", 
+            "route": "detektyw", 
+            "player_status": fun_detektyw, 
+            "player_info": "Na początku wiesz, że 1 z 2 graczy jest konkretnym Minionem. Detektyw dowiaduje się, że konkretny Minion jest w grze, ale nie kto go gra."
+        },
+        {
+            "client_id": None, 
+            "name": "Kucharz", 
+            "file": "kucharz.png", 
+            "route": "kucharz", 
+            "player_status": fun_kucharz, 
+            "player_info": "Na początku wiesz, ile par złych graczy siedzi obok siebie. Kucharz wie, czy źli gracze siedzą obok siebie."
+        },
         {"client_id": None, "name": "Empata", "file": "empata.png", "route": "empata", "player_status": fun_empata, "player_info": "TBD"},
-        {"client_id": None, "name": "Wróżka", "file": "wrozka.png", "route": "wrozka", "player_status": fun_wrozka, "player_info": "TBD"},
-        {"client_id": None, "name": "Kantor", "file": "kantor.png", "route": "kantor", "player_status": fun_kantor, "player_info": "TBD"},
+        {"client_id": None, "name": "Jasnowidz", "file": "jasnowidz.png", "route": "jasnowidz", "player_status": fun_jasnowidz, "player_info": "TBD"},
+        {"client_id": None, "name": "Grabarz", "file": "grabarz.png", "route": "grabarz", "player_status": fun_grabarz, "player_info": "TBD"},
         {"client_id": None, "name": "Mnich", "file": "mnich.png", "route": "mnich", "player_status": fun_mnich, "player_info": "TBD"},
         {"client_id": None, "name": "Strażnik Kruka", "file": "krukopiek.png", "route": "krukopiek", "player_status": fun_krukopiek, "player_info": "TBD"},
         {"client_id": None, "name": "Dziewica", "file": "dziewica.png", "route": "dziewica", "player_status": fun_dziewica, "player_info": "TBD"},

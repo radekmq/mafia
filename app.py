@@ -207,7 +207,12 @@ def create():
             
             print("\n\n")
             global db_game_selection
-            db_game_selection = assign_players_to_characters(db_players.get_all_client_ids(), trouble_brewing_setup, db_characters)
+            db_game_selection = assign_players_to_characters(
+                db_players.get_all_client_ids(),
+                trouble_brewing_setup,
+                db_characters,
+                db_players.get_all(),
+            )
             redirect_players_to_character_pages()
             
         return jsonify({"error": "ok"}), 200
@@ -288,12 +293,14 @@ def player_page():
     client_id = session.get("client_id")
     if client_id == None: 
         return redirect(url_for("index"))
+    if not db_game_selection:
+        return redirect(url_for("index"))
     
     character = find_character_by_client_id(client_id, db_game_selection)
     if not character:
         abort(404, description=f"Brak postaci o client_id={client_id}")
 
-    player_status = character["player_status"](db_characters, db_players)
+    player_status = character["player_status"](db_game_selection, db_players)
     player_info = character["player_info"]
     player_image = f"/static/images/{character['file']}"
     player_link = f"/player/{client_id}"
@@ -308,12 +315,15 @@ def player_page():
     )
     
 def update_player(client_id):  
-    character = find_character_by_client_id(client_id, db_characters)
+    if not db_game_selection:
+        return redirect(url_for("index"))
+
+    character = find_character_by_client_id(client_id, db_game_selection)
     if not character:
         return redirect(url_for("index"))
 
     emit("update_player_status", {
-        "player_status": character["player_status"](db_characters, db_players),
+        "player_status": character["player_status"](db_game_selection, db_players),
         "player_info": character["player_info"],
         "player_image": f"/static/images/{character['file']}",
         "player_link": f"/player/{character['client_id']}"

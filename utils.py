@@ -235,11 +235,16 @@ def assign_players_to_characters(client_ids, trouble_brewing_setup, db_character
                 f"otrzymal dodatkowa postac={extra_copy['name']}"
             )
 
-            # dopisz w rekordzie Pijaka jego dodatkową postać (lista)
+            # dopisz w rekordzie Pijaka jego dodatkową postać (lista) i mapowanie maski
             for category in new_db_characters.values():
                 for c in category:
                     if c["name"] == "Pijak" and c["client_id"] == drunk_extra_pending:
                         c["druga_postac"] = [extra_copy["name"]]
+                        c["drunk_role_name"] = extra_copy["name"]
+                        print(
+                            "[assign_players_to_characters] Ustawiono maskowanie Pijaka: "
+                            f"client_id={drunk_extra_pending}, real_role=Pijak, visible_role={extra_copy['name']}"
+                        )
         else:
             print("[assign_players_to_characters] Brak dodatkowej postaci dla Pijaka")
 
@@ -367,8 +372,6 @@ def fun_praczka(characters, players, drunk=False):
             f"ma postać: {mieszkaniec['name']}"
         )
 
-    # Zapisz status w bazie
-    mieszkaniec["player_status"] = tekst
     return tekst
 
 
@@ -504,11 +507,127 @@ def fun_detektyw(characters, players):
         f"Przykładowi gracze: {name1} oraz {name2}."
     )
 
-def fun_kucharz(characters, players):
-    return "Na razie nic."
+def fun_kucharz(characters, players, drunk=False):
+    """
+    Funkcja dla postaci 'Kucharz'.
+    Informuje, ile par złych postaci (Minionki lub Demon) siedzi obok siebie.
+    Sąsiedztwo liczone jest po okręgu, więc pierwszy i ostatni gracz też sąsiadują.
+    """
+
+    if len(players) < 2:
+        return "Brak wystarczającej liczby graczy do losowania."
+
+    bad_roles = characters.get("Minionki", []) + characters.get("Demon", [])
+    bad_client_ids = {
+        char.get("client_id")
+        for char in bad_roles
+        if char.get("client_id") in players
+    }
+
+    if drunk:
+        max_pairs = (len(bad_client_ids) // 2) + 1
+        return f"Liczba par złych postaci siedzących obok siebie: {random.randint(0, max_pairs)}."
+
+    seated_players = []
+    for client_id, player in players.get_all().items():
+        seat = player.get("seat")
+        if seat is None:
+            continue
+
+        seated_players.append({
+            "client_id": client_id,
+            "seat": seat,
+            "is_bad": client_id in bad_client_ids,
+        })
+
+    if len(seated_players) < 2:
+        return "Brak wystarczających danych o miejscach graczy."
+
+    seated_players.sort(key=lambda player: player["seat"])
+
+    bad_pairs = 0
+    for index, current_player in enumerate(seated_players):
+        next_player = seated_players[(index + 1) % len(seated_players)]
+        if current_player["is_bad"] and next_player["is_bad"]:
+            bad_pairs += 1
+
+    return f"Liczba par złych postaci siedzących obok siebie: {bad_pairs}."
 
 def fun_empata(characters, players):
-    return "Na razie nic."
+    """
+    Funkcja dla postaci 'Empata'.
+    Zwraca liczbę złych sąsiadów (Minionki + Demon), pomijając sąsiadów z executed=True.
+    Sąsiedztwo liczone po okręgu według numeru miejsca.
+    """
+    all_players = players.get_all()
+    if len(all_players) < 3:
+        return "Brak wystarczającej liczby graczy do działania Empaty."
+
+    empath_character = None
+    for char in characters.get("Mieszkańcy", []):
+        if char.get("name") == "Empata" and char.get("client_id") in all_players:
+            empath_character = char
+            break
+
+    if not empath_character:
+        return "Empata nie jest w tej grze."
+
+    empath_client_id = empath_character.get("client_id")
+    empath_player = all_players.get(empath_client_id)
+    if not empath_player:
+        return "Brak danych gracza Empaty."
+
+    empath_seat = empath_player.get("seat")
+    if empath_seat is None:
+        return "Brak numeru miejsca dla Empaty."
+
+    seated_players = []
+    for client_id, player in all_players.items():
+        seat = player.get("seat")
+        if seat is None:
+            continue
+        seated_players.append(
+            {
+                "client_id": client_id,
+                "seat": seat,
+                "executed": bool(player.get("executed", False)),
+            }
+        )
+
+    if len(seated_players) < 3:
+        return "Brak wystarczających danych o miejscach graczy."
+
+    seated_players.sort(key=lambda player: player["seat"])
+
+    empath_index = None
+    for index, player in enumerate(seated_players):
+        if player["client_id"] == empath_client_id:
+            empath_index = index
+            break
+
+    if empath_index is None:
+        return "Nie znaleziono Empaty przy stole."
+
+    left_neighbor = seated_players[(empath_index - 1) % len(seated_players)]
+    right_neighbor = seated_players[(empath_index + 1) % len(seated_players)]
+
+    evil_client_ids = {
+        char.get("client_id")
+        for char in (characters.get("Minionki", []) + characters.get("Demon", []))
+        if char.get("client_id") in all_players
+    }
+
+    evil_neighbors = 0
+    for neighbor in [left_neighbor, right_neighbor]:
+        if neighbor["executed"]:
+            continue
+        if neighbor["client_id"] in evil_client_ids:
+            evil_neighbors += 1
+
+    return (
+        "Liczba żyjących złych sąsiadów Empaty "
+        f"(Minionki + Demon): {evil_neighbors}."
+    )
 
 def fun_jasnowidz(characters, players):
     return "Na razie nic."

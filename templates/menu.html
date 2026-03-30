@@ -1,6 +1,6 @@
 {% extends "base.html" %}
 
-{% block title %}Tęczowa Mafia – Strona główna{% endblock %}
+{% block title %}Blood on the clocktower – Strona główna{% endblock %}
 
 {% block content %}
   
@@ -20,13 +20,17 @@
           <td ><p id="postacie_wylosowane" style="text-align: center;">{{postacie_wylosowane}}</p></td>
         </tr>
         <tr>
+          <td>Aktualny tryb:</td>
+          <td><p id="aktualny_tryb" style="text-align: center;">{{ "Dzień" if current_mode == "day" else "Noc" }}</p></td>
+        </tr>
+        <tr>
           <td colspan="2" onclick="showCharacters()" style="text-align: center;">Losuj postacie</td>
         </tr>
         <tr>
-          <td colspan="2" onclick="createGame()" style="text-align: center;">Rozpocznij grę</td>
+          <td colspan="2" onclick="setGameMode('day')" style="text-align: center;">Włącz tryb dzień</td>
         </tr>
         <tr>
-          <td colspan="2" onclick="window.location.href='/'" style="text-align: center;">Wróć do początku strony</td>
+          <td colspan="2" onclick="setGameMode('night')" style="text-align: center;">Włącz tryb noc</td>
         </tr>
       </table>
     </div>
@@ -38,6 +42,9 @@
     socket.on("update_game_status", data => {
       document.getElementById("liczba_graczy").textContent = data.no_of_players;
       document.getElementById("postacie_wylosowane").textContent = data.char_presented
+      if (data.mode === "day" || data.mode === "night") {
+        document.getElementById("aktualny_tryb").textContent = data.mode === "day" ? "Dzień" : "Noc";
+      }
     });
 
     async function createGame() {
@@ -81,6 +88,28 @@
         if (!response.ok) {
           const res = await response.json();
           errorMsg.textContent = res.error || "Nie udało się rozdzielić postaci.";
+          return;
+        }
+      } catch (err) {
+        console.error(err);
+        errorMsg.textContent = "Błąd połączenia z serwerem.";
+      }
+    }
+
+    async function setGameMode(mode) {
+      const errorMsg = document.getElementById("errorMsg");
+      errorMsg.textContent = "";
+
+      try {
+        const response = await fetch("/game-mode", {
+          method: "POST",
+          headers: { "Content-Type": "application/x-www-form-urlencoded" },
+          body: new URLSearchParams({ mode })
+        });
+
+        if (!response.ok) {
+          const res = await response.json();
+          errorMsg.textContent = res.error || "Nie udało się zmienić trybu gry.";
           return;
         }
       } catch (err) {

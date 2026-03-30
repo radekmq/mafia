@@ -1,8 +1,27 @@
 {% extends "base.html" %}
 
-{% block title %}Tęczowa Mafia – Strona główna{% endblock %}
+{% block title %}Blood on the clocktower – Strona główna{% endblock %}
 
 {% block content %}
+<script id="modeStateData" type="application/json">{{ {"mode": current_mode} | tojson }}</script>
+
+{% if is_night %}
+<div class="container" style="overflow-x:auto;">
+  <p style="text-align: center; font-weight: bold;">Tryb noc aktywowany, czekaj na rozpoczęcie dnia</p>
+</div>
+
+<script>
+  function refreshPlayerPage() {
+    window.location.href = `/player_page?t=${Date.now()}`;
+  }
+
+  socket.on("update_game_status", data => {
+    if (data.mode === "day") {
+      refreshPlayerPage();
+    }
+  });
+</script>
+{% else %}
 <div class="container" style="overflow-x:auto;">
   <table id="player_table" cellspacing="0" cellpadding="8">
     <tr>
@@ -19,9 +38,188 @@
       <td colspan="2" data-key="player_status" style="white-space: pre-line;">{{ player_status }}</td>
     </tr>
   </table>
+
+  <div id="executionControls" style="margin-top: 20px;">
+    <p id="voteError" style="color: red; font-weight: bold;"></p>
+    <p id="voteInfo" style="font-weight: bold;"></p>
+
+    <button id="nominateBtn" type="button" style="display: none;">Nominuj do wyeliminowania</button>
+
+    <div id="nominationPanel" style="display: none; margin-top: 12px;">
+      <label for="nomineeSelect">Wybierz gracza do nominacji:</label>
+      <select id="nomineeSelect"></select>
+      <button id="confirmNominationBtn" type="button">Rozpocznij głosowanie</button>
+      <button id="cancelNominationBtn" type="button">Anuluj</button>
+    </div>
+
+    <div id="votePanel" style="display: none; margin-top: 12px;">
+      <p id="voteQuestion" style="text-align: center; font-weight: bold;"></p>
+      <button id="voteYesBtn" type="button">TAK</button>
+      <button id="voteNoBtn" type="button">NIE</button>
+    </div>
+  </div>
 </div>
 
+<script id="playerStateData" type="application/json">{{ {"clientId": client_id, "executed": is_executed, "voteDead": vote_dead} | tojson }}</script>
+
 <script>
+  const playerState = JSON.parse(document.getElementById("playerStateData").textContent);
+
+  const nominateBtn = document.getElementById("nominateBtn");
+  const nominationPanel = document.getElementById("nominationPanel");
+  const nomineeSelect = document.getElementById("nomineeSelect");
+  const confirmNominationBtn = document.getElementById("confirmNominationBtn");
+  const cancelNominationBtn = document.getElementById("cancelNominationBtn");
+  const votePanel = document.getElementById("votePanel");
+  const voteQuestion = document.getElementById("voteQuestion");
+  const voteYesBtn = document.getElementById("voteYesBtn");
+  const voteNoBtn = document.getElementById("voteNoBtn");
+  const voteError = document.getElementById("voteError");
+  const voteInfo = document.getElementById("voteInfo");
+  let hasSubmittedVote = false;
+
+  function refreshPlayerPage() {
+    window.location.href = `/player_page?t=${Date.now()}`;
+  }
+
+  function canNominate() {
+    return !playerState.executed;
+  }
+
+  function canVote() {
+    return !playerState.executed || playerState.voteDead;
+  }
+
+  function renderNominationControls() {
+    nominateBtn.style.display = canNominate() ? "block" : "none";
+    if (!canNominate()) {
+      nominationPanel.style.display = "none";
+    }
+  }
+
+  function setVotingButtonsDisabled(disabled) {
+    voteYesBtn.disabled = disabled;
+    voteNoBtn.disabled = disabled;
+  }
+
+  function submitExecutionVote(vote, label) {
+    voteError.textContent = "";
+    hasSubmittedVote = true;
+    setVotingButtonsDisabled(true);
+    votePanel.style.display = "none";
+    voteInfo.textContent = `Oddano głos: ${label}. Czekaj na zakończenie głosowania.`;
+    socket.emit("cast_execution_vote", { clientId: playerState.clientId, vote });
+  }
+
+  renderNominationControls();
+
+  nominateBtn.addEventListener("click", () => {
+    voteError.textContent = "";
+    voteInfo.textContent = "";
+    socket.emit("request_nomination_candidates", { clientId: playerState.clientId });
+  });
+
+  cancelNominationBtn.addEventListener("click", () => {
+    nominationPanel.style.display = "none";
+  });
+
+  confirmNominationBtn.addEventListener("click", () => {
+    voteError.textContent = "";
+    const nomineeClientId = nomineeSelect.value;
+
+    if (!nomineeClientId) {
+      voteError.textContent = "Wybierz gracza do nominacji.";
+      return;
+    }
+
+    socket.emit("start_execution_vote", {
+      clientId: playerState.clientId,
+      nominee_client_id: nomineeClientId
+    });
+  });
+
+  voteYesBtn.addEventListener("click", () => {
+    submitExecutionVote("yes", "TAK");
+  });
+
+  voteNoBtn.addEventListener("click", () => {
+    submitExecutionVote("no", "NIE");
+  });
+
+  socket.on("nomination_candidates", data => {
+    voteError.textContent = "";
+
+    if (data.error) {
+      voteError.textContent = data.error;
+      nominationPanel.style.display = "none";
+      return;
+    }
+
+    nomineeSelect.innerHTML = "";
+    const candidates = Array.isArray(data.players) ? data.players : [];
+
+    candidates.forEach(player => {
+      const option = document.createElement("option");
+      const seatLabel = player.seat ? ` (miejsce ${player.seat})` : "";
+      option.value = player.client_id;
+      option.textContent = `${player.name}${seatLabel}`;
+      nomineeSelect.appendChild(option);
+    });
+
+    nominationPanel.style.display = candidates.length ? "block" : "none";
+    if (!candidates.length) {
+      voteError.textContent = "Brak dostępnych graczy do nominacji.";
+    }
+  });
+
+  socket.on("execution_vote_started", data => {
+    nominationPanel.style.display = "none";
+    voteError.textContent = "";
+
+    voteQuestion.textContent = `Czy chcesz wyeliminować gracza: ${data.nominee_name} z gry?`;
+    hasSubmittedVote = false;
+
+    const allowedToVote = data.can_vote === true && canVote();
+    votePanel.style.display = allowedToVote ? "block" : "none";
+
+    if (allowedToVote) {
+      voteInfo.textContent = "Oddaj głos: TAK lub NIE.";
+      setVotingButtonsDisabled(false);
+    } else {
+      voteInfo.textContent = "Trwa głosowanie. Nie musisz oddawać głosu.";
+    }
+  });
+
+  socket.on("execution_vote_error", data => {
+    voteError.textContent = data.error || "Wystąpił błąd głosowania.";
+
+    if (hasSubmittedVote) {
+      voteInfo.textContent = "Nie udało się zapisać Twojego głosu. Spróbuj ponownie.";
+      votePanel.style.display = canVote() ? "block" : "none";
+    }
+
+    setVotingButtonsDisabled(false);
+    hasSubmittedVote = false;
+  });
+
+  socket.on("execution_vote_result", data => {
+    votePanel.style.display = "none";
+    nominationPanel.style.display = "none";
+    voteError.textContent = "";
+
+    const summary = `${data.message} Wynik głosowania: TAK=${data.yes_votes}, NIE=${data.no_votes}.`;
+    voteInfo.textContent = summary;
+
+    if (data.player_flags) {
+      playerState.executed = !!data.player_flags.executed;
+      playerState.voteDead = !!data.player_flags.vote_dead;
+      renderNominationControls();
+    }
+
+    setVotingButtonsDisabled(false);
+    hasSubmittedVote = false;
+  });
+
   socket.on("update_player_status", data => {
     console.log("🔄 Otrzymano update_player_status:", data);
 
@@ -47,6 +245,63 @@
       el.style.backgroundColor = "#fff3cd";
       setTimeout(() => el.style.backgroundColor = "", 600);
     }
+  });
+
+  socket.on("update_game_status", data => {
+    if (data.mode === "night") {
+      refreshPlayerPage();
+    }
+  });
+</script>
+{% endif %}
+
+<script>
+  const modeState = JSON.parse(document.getElementById("modeStateData").textContent);
+  let isReloadingForModeChange = false;
+
+  function redirectForModeChange() {
+    if (isReloadingForModeChange) {
+      return;
+    }
+    isReloadingForModeChange = true;
+    window.location.href = `/player_page?t=${Date.now()}`;
+  }
+
+  async function checkModeFallback() {
+    try {
+      const response = await fetch("/game-status", { cache: "no-store" });
+      if (!response.ok) {
+        return;
+      }
+
+      const data = await response.json();
+      if ((data.mode === "day" || data.mode === "night") && data.mode !== modeState.mode) {
+        redirectForModeChange();
+      }
+    } catch (err) {
+      console.warn("Fallback mode check failed:", err);
+    }
+  }
+
+  checkModeFallback();
+  setInterval(checkModeFallback, 1000);
+
+  document.addEventListener("visibilitychange", () => {
+    if (!document.hidden) {
+      checkModeFallback();
+    }
+  });
+
+  window.addEventListener("pageshow", () => {
+    checkModeFallback();
+  });
+
+  window.addEventListener("focus", () => {
+    checkModeFallback();
+  });
+
+  socket.on("connect", () => {
+    checkModeFallback();
   });
 </script>
 {% endblock %}

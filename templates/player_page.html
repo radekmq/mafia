@@ -5,6 +5,34 @@
 {% block content %}
 <script id="modeStateData" type="application/json">{{ {"mode": current_mode} | tojson }}</script>
 
+{% if is_admin %}
+<div class="container" id="adminCombinedPanel" style="margin-bottom: 16px;">
+  <h3 style="text-align:center; margin-top: 0;">Panel administratora</h3>
+  <p id="adminErrorMsg" style="color: red; font-weight: bold; text-align: center;"></p>
+
+  <table cellspacing="0" cellpadding="8">
+    <tr>
+      <td>Aktualna liczba graczy:</td>
+      <td><p id="adminLiczbaGraczy" style="text-align: center; margin: 0;">{{ liczba_graczy }}</p></td>
+    </tr>
+    <tr>
+      <td>Postacie wylosowane:</td>
+      <td><p id="adminPostacieWylosowane" style="text-align: center; margin: 0;">{{ "TAK" if char_presented else "NIE" }}</p></td>
+    </tr>
+    <tr>
+      <td>Aktualny tryb:</td>
+      <td><p id="adminAktualnyTryb" style="text-align: center; margin: 0;">{{ "Dzień" if current_mode == "day" else "Noc" }}</p></td>
+    </tr>
+  </table>
+
+  <div style="display:flex; gap:10px; flex-wrap:wrap; justify-content:center; margin-top: 12px;">
+    <button id="adminShowCharactersBtn" type="button">Losuj postacie</button>
+    <button id="adminDayModeBtn" type="button">Włącz tryb dzień</button>
+    <button id="adminNightModeBtn" type="button">Włącz tryb noc</button>
+  </div>
+</div>
+{% endif %}
+
 {% if is_night %}
 <div class="container" style="overflow-x:auto;">
   {% if is_imp %}
@@ -473,4 +501,84 @@
     checkModeFallback();
   });
 </script>
+
+{% if is_admin %}
+<script>
+  (function setupAdminControls() {
+    const adminPanel = document.getElementById("adminCombinedPanel");
+    if (!adminPanel) {
+      return;
+    }
+
+    const adminErrorMsg = document.getElementById("adminErrorMsg");
+    const adminLiczbaGraczy = document.getElementById("adminLiczbaGraczy");
+    const adminPostacieWylosowane = document.getElementById("adminPostacieWylosowane");
+    const adminAktualnyTryb = document.getElementById("adminAktualnyTryb");
+
+    const adminShowCharactersBtn = document.getElementById("adminShowCharactersBtn");
+    const adminDayModeBtn = document.getElementById("adminDayModeBtn");
+    const adminNightModeBtn = document.getElementById("adminNightModeBtn");
+
+    function setAdminError(text) {
+      adminErrorMsg.textContent = text || "";
+    }
+
+    async function showCharacters() {
+      setAdminError("");
+      try {
+        const response = await fetch("/create", {
+          method: "POST",
+          headers: { "Content-Type": "application/x-www-form-urlencoded" },
+          body: new URLSearchParams({ event: "show" })
+        });
+
+        if (!response.ok) {
+          const res = await response.json();
+          setAdminError(res.error || "Nie udało się rozdzielić postaci.");
+        }
+      } catch (err) {
+        console.error(err);
+        setAdminError("Błąd połączenia z serwerem.");
+      }
+    }
+
+    async function setGameMode(mode) {
+      setAdminError("");
+      try {
+        const response = await fetch("/game-mode", {
+          method: "POST",
+          headers: { "Content-Type": "application/x-www-form-urlencoded" },
+          body: new URLSearchParams({ mode })
+        });
+
+        if (!response.ok) {
+          const res = await response.json();
+          setAdminError(res.error || "Nie udało się zmienić trybu gry.");
+        }
+      } catch (err) {
+        console.error(err);
+        setAdminError("Błąd połączenia z serwerem.");
+      }
+    }
+
+    adminShowCharactersBtn.addEventListener("click", showCharacters);
+    adminDayModeBtn.addEventListener("click", () => setGameMode("day"));
+    adminNightModeBtn.addEventListener("click", () => setGameMode("night"));
+
+    socket.on("update_game_status", data => {
+      if (typeof data.no_of_players !== "undefined") {
+        adminLiczbaGraczy.textContent = data.no_of_players;
+      }
+
+      if (typeof data.char_presented !== "undefined") {
+        adminPostacieWylosowane.textContent = data.char_presented ? "TAK" : "NIE";
+      }
+
+      if (data.mode === "day" || data.mode === "night") {
+        adminAktualnyTryb.textContent = data.mode === "day" ? "Dzień" : "Noc";
+      }
+    });
+  })();
+</script>
+{% endif %}
 {% endblock %}

@@ -1,7 +1,7 @@
 import random
 import copy
 
-test_enabled = True
+test_enabled = False
 
 class Database:
     def __init__(self):
@@ -202,6 +202,8 @@ def assign_players_to_characters(client_ids, trouble_brewing_setup, db_character
     # Przydziel postacie graczom
     for client_id, char in zip(client_ids, all_characters):
         char["client_id"] = client_id
+        if players_db and client_id in players_db:
+            char["numer_siedzenia"] = players_db[client_id].get("seat")
         print(
             f"[assign_players_to_characters] Przydzielono postac={char['name']} "
             f"do client_id={client_id}"

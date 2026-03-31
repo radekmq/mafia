@@ -2,7 +2,7 @@
 from flask import Flask, render_template, request, redirect, url_for, session, jsonify, abort
 from flask_socketio import SocketIO, join_room, leave_room, emit
 from uuid import uuid4
-from utils import Database, assign_players_to_characters, fun_praczka
+from utils import Database, assign_players_to_characters, fun_praczka, test_enabled
 import random
 import inspect
 
@@ -272,6 +272,13 @@ def seed_default_players_for_admin():
                 "sid": None,
             },
         )
+
+
+def remove_default_test_players():
+    for default_player in DEFAULT_TEST_PLAYERS:
+        default_client_id = default_player["client_id"]
+        if default_client_id in db_players:
+            remove_player_from_game(default_client_id)
 
 
 def resolve_back_endpoint(default_endpoint="index"):
@@ -610,23 +617,30 @@ def save_player():
             except ValueError as exc:
                 return jsonify({"error": str(exc)}), 400
 
+        elif str(raw_seat or "").strip():
+            try:
+                seat = parse_seat(raw_seat)
+            except ValueError as exc:
+                return jsonify({"error": str(exc)}), 400
+
+        if seat is not None:
             if is_seat_taken(seat, excluded_client_id=client_id):
                 return jsonify({"error": f"Miejsce numer {seat} jest już zajęte"}), 400
-        
+
         if is_admin_login:
             db_game["admin_id"] = client_id
-            seed_default_players_for_admin()
-            db_game["no_of_players"] = len(db_players)
-            socketio.emit("update_game_status", build_game_status_payload())
-            
-            return redirect(url_for("handle_menu"))
-        
+            if test_enabled:
+                print("Testowy login administratora - dodaję domyślnych graczy do bazy")
+                seed_default_players_for_admin()
+            else:
+                remove_default_test_players()
+
         if client_id not in db_players:
             print(f"Dodaje nowego gracza: {name}, postać: {character}, seat: {seat}")
             db_players.add(client_id, { "name" : None, "character" : None, "seat": None, "executed": False, "vote_dead": True, "sid": None} )
 
         db_players[client_id]["name"] = name
-        db_players[client_id]["character"] = character
+        db_players[client_id]["character"] = "admin" if is_admin_login else character
         db_players[client_id]["seat"] = seat
         db_players[client_id].setdefault("executed", False)
         db_players[client_id].setdefault("vote_dead", True)
@@ -644,6 +658,12 @@ def save_player():
         db_game["no_of_players"] = len(db_players)
         socketio.emit("update_game_status", build_game_status_payload())
         print("Aktualna baza graczy:", db_players._data)
+
+        if is_admin_login:
+            if db_game.get("char_presented") and db_game_selection:
+                return redirect(url_for("player_page"))
+            return redirect(url_for("handle_menu"))
+
         return redirect(url_for("lobby"))
     else:
         print(f"Unknown {client_id=}")
@@ -1008,6 +1028,9 @@ def player_page():
         is_jasnowidz=is_jasnowidz,
         jasnowidz_used_today=jasnowidz_used_today,
         night_players=night_players,
+        is_admin=(client_id == db_game.get("admin_id")),
+        liczba_graczy=len(db_players),
+        char_presented=db_game.get("char_presented", False),
     )
     
 def update_player(client_id):  

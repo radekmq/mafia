@@ -40,6 +40,29 @@
       const saveBtn = document.getElementById("saveBtn");
       const errorMsg = document.getElementById("errorMsg");
 
+      const tryResumeSession = async () => {
+        const activeClientId = window.clientId || clientId;
+        if (!activeClientId) {
+          return;
+        }
+
+        try {
+          const response = await fetch("/resume-session", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ clientId: activeClientId })
+          });
+
+          if (response.redirected) {
+            window.location.href = response.url;
+          }
+        } catch (err) {
+          console.warn("Auto-resume session failed:", err);
+        }
+      };
+
+      tryResumeSession();
+
       saveBtn.addEventListener("click", async () => {
         const name = inputName.value.trim();
         const numerMiejsca = inputSeat.value.trim();

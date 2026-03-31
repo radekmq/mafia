@@ -48,7 +48,7 @@ execution_vote_state = {
     "optional_voters": [],
 }
 
-ALLOWED_BACK_ENDPOINTS = {"lobby", "handle_menu", "index"}
+ALLOWED_BACK_ENDPOINTS = {"lobby", "handle_menu", "index", "player_page"}
 
 
 def parse_seat(raw_seat):
@@ -109,6 +109,53 @@ def build_game_status_payload():
         "day_number": db_game.get("day_number", 1),
         "winner": db_game.get("winner"),
     }
+
+
+def get_truciciel_character():
+    if not db_game_selection:
+        return None
+
+    for char in db_game_selection.get("Minionki", []):
+        if char.get("name") == "Truciciel" and char.get("client_id") in db_players:
+            return char
+
+    return None
+
+
+def is_client_poisoned_today(client_id, day_number=None):
+    if not client_id:
+        return False
+
+    truciciel_character = get_truciciel_character()
+    if not truciciel_character:
+        return False
+
+    if day_number is None:
+        day_number = db_game.get("day_number", 1)
+
+    poison_targets_by_day = truciciel_character.get("truciciel_poison_targets_by_day", {})
+    poisoned_client_id = poison_targets_by_day.get(str(day_number))
+    return poisoned_client_id == client_id
+
+
+def invalidate_dynamic_statuses():
+    if not db_game_selection:
+        return
+
+    for characters in db_game_selection.values():
+        for character in characters:
+            player_status_field = character.get("player_status")
+            if not callable(player_status_field):
+                continue
+
+            try:
+                signature = inspect.signature(player_status_field)
+            except (TypeError, ValueError):
+                continue
+
+            if any(param in signature.parameters for param in {"mode", "day_number", "poisoned"}):
+                character.pop("resolved_player_status", None)
+                character.pop("resolved_player_status_key", None)
 
 
 def check_and_announce_evil_win_if_needed():
@@ -292,6 +339,23 @@ def resolve_back_endpoint(default_endpoint="index"):
     if client_id == db_game.get("admin_id"):
         return "handle_menu"
     return default_endpoint
+
+
+def get_resume_redirect_endpoint(client_id):
+    if not client_id:
+        return None
+
+    if client_id == db_game.get("admin_id"):
+        if db_game.get("char_presented") and db_game_selection:
+            return "player_page"
+        return "handle_menu"
+
+    if client_id in db_players:
+        if db_game.get("char_presented") and db_game_selection:
+            return "player_page"
+        return "lobby"
+
+    return None
 
 @socketio.on('connect')
 def handle_connect():
@@ -566,6 +630,10 @@ def handle_jasnowidz_day_action(data):
 
     target_pair = {first_target_client_id, second_target_client_id}
     has_imp = any(client_id in imp_client_ids for client_id in target_pair)
+
+    if is_client_poisoned_today(actor_client_id, day_number):
+        has_imp = random.choice([True, False])
+
     answer = "TAK" if has_imp else "NIE"
 
     first_name = db_players[first_target_client_id].get("name", "Nieznany")
@@ -577,13 +645,73 @@ def handle_jasnowidz_day_action(data):
     real_character["jasnowidz_last_day_used"] = day_number
     real_character["jasnowidz_daily_result"] = result_message
     real_character.pop("resolved_player_status", None)
+    real_character.pop("resolved_player_status_key", None)
 
     emit("jasnowidz_action_result", {"message": result_message})
+    emit("force_player_page_refresh", {})
+
+
+@socketio.on("truciciel_day_action")
+def handle_truciciel_day_action(data):
+    actor_client_id = data.get("clientId") or data.get("client_id")
+    target_client_id = data.get("target_client_id")
+
+    if not db_game_selection:
+        emit("truciciel_action_error", {"error": "Brak aktywnej rozgrywki."})
+        return
+
+    if db_game.get("mode") != "day":
+        emit("truciciel_action_error", {"error": "Akcja Truciciela jest dostępna tylko w dzień."})
+        return
+
+    if not actor_client_id or actor_client_id not in db_players:
+        emit("truciciel_action_error", {"error": "Nie znaleziono gracza wykonującego akcję."})
+        return
+
+    if not target_client_id or target_client_id not in db_players:
+        emit("truciciel_action_error", {"error": "Nie znaleziono wybranego celu."})
+        return
+
+    ensure_player_flags(db_players[actor_client_id])
+    if db_players[actor_client_id]["executed"]:
+        emit("truciciel_action_error", {"error": "Wyeliminowany Truciciel nie może wykonać akcji."})
+        return
+
+    real_character, _ = get_player_character_views(actor_client_id)
+    if not real_character or real_character.get("name") != "Truciciel":
+        emit("truciciel_action_error", {"error": "Tylko Truciciel może wykonać tę akcję."})
+        return
+
+    day_number = db_game.get("day_number", 1)
+    if real_character.get("truciciel_last_day_used") == day_number:
+        emit("truciciel_action_error", {"error": "Dzisiaj wykorzystałeś już zatrucie."})
+        return
+
+    poison_targets_by_day = real_character.setdefault("truciciel_poison_targets_by_day", {})
+    next_day = day_number + 1
+    poison_targets_by_day[str(next_day)] = target_client_id
+
+    real_character["truciciel_last_day_used"] = day_number
+    real_character["truciciel_last_selected_target_client_id"] = target_client_id
+    real_character.pop("resolved_player_status", None)
+    real_character.pop("resolved_player_status_key", None)
+
+    target_name = db_players[target_client_id].get("name", "Nieznany")
+    result_message = (
+        f"Wybrałeś cel zatrucia: {target_name}. "
+        f"Efekt zatrucia będzie aktywny od dnia {next_day}."
+    )
+
+    emit("truciciel_action_result", {"message": result_message})
     emit("force_player_page_refresh", {})
         
 @app.route("/")
 def index():
     client_id = session.get("client_id")
+    redirect_endpoint = get_resume_redirect_endpoint(client_id)
+    if redirect_endpoint:
+        return redirect(url_for(redirect_endpoint))
+
     if client_id and client_id in db_players:
         return render_template(
             "index.html",
@@ -593,6 +721,19 @@ def index():
         )
     else:
         return render_template("index.html", name="", character="", numer_miejsca="")
+
+
+@app.route("/resume-session", methods=["POST"])
+def resume_session():
+    data = request.get_json(silent=True) or {}
+    client_id = data.get("clientId") or data.get("client_id")
+    redirect_endpoint = get_resume_redirect_endpoint(client_id)
+
+    if not redirect_endpoint:
+        return jsonify({"status": "not-found"}), 404
+
+    session["client_id"] = client_id
+    return redirect(url_for(redirect_endpoint))
 
 @app.route("/save-player", methods=["POST"])
 def save_player():
@@ -736,10 +877,7 @@ def set_game_mode():
         db_game["day_number"] = db_game.get("day_number", 1) + 1
 
     if previous_mode != mode and db_game_selection:
-        for characters in db_game_selection.values():
-            for character in characters:
-                if character.get("name") in {"Empata", "Imp", "Jasnowidz"}:
-                    character.pop("resolved_player_status", None)
+        invalidate_dynamic_statuses()
 
     db_game["mode"] = mode
     socketio.emit("update_game_status", build_game_status_payload())
@@ -920,27 +1058,51 @@ def get_player_character_views(client_id):
 
 
 def get_stable_player_status(character):
-    # Status losowany raz na postac i trzymany do kolejnego losowania postaci.
-    if "resolved_player_status" in character:
-        return character["resolved_player_status"]
-
     player_status_field = character.get("player_status")
     if callable(player_status_field):
         kwargs = {}
+        cache_key = None
         try:
             signature = inspect.signature(player_status_field)
             if "mode" in signature.parameters:
                 kwargs["mode"] = db_game.get("mode", "day")
             if "day_number" in signature.parameters:
                 kwargs["day_number"] = db_game.get("day_number", 1)
+            if "poisoned" in signature.parameters:
+                kwargs["poisoned"] = (
+                    db_game.get("mode", "day") == "day"
+                    and is_client_poisoned_today(
+                        character.get("client_id"),
+                        db_game.get("day_number", 1),
+                    )
+                )
+            if kwargs:
+                cache_key = tuple(sorted(kwargs.items()))
         except (TypeError, ValueError):
             kwargs = {}
+            cache_key = None
+
+        if "resolved_player_status" in character:
+            if cache_key is None and character.get("resolved_player_status_key") is None:
+                return character["resolved_player_status"]
+            if cache_key is not None and character.get("resolved_player_status_key") == cache_key:
+                return character["resolved_player_status"]
 
         resolved_status = player_status_field(db_game_selection, db_players, **kwargs)
+        if cache_key is not None:
+            character["resolved_player_status_key"] = cache_key
+        else:
+            character.pop("resolved_player_status_key", None)
     elif isinstance(player_status_field, str):
+        if "resolved_player_status" in character:
+            return character["resolved_player_status"]
         resolved_status = player_status_field
+        character.pop("resolved_player_status_key", None)
     else:
+        if "resolved_player_status" in character:
+            return character["resolved_player_status"]
         resolved_status = "Brak informacji o statusie postaci."
+        character.pop("resolved_player_status_key", None)
 
     character["resolved_player_status"] = resolved_status
     return resolved_status
@@ -985,10 +1147,11 @@ def player_page():
     player_status = get_stable_player_status(visible_character)
     player_info = visible_character["player_info"]
     player_image = f"/static/images/{visible_character['file']}"
-    player_link = f"/player/{client_id}"
+    player_link = url_for("postac", route=visible_character["route"], back="player_page")
     ensure_player_flags(db_players[client_id])
     is_imp = bool(real_character and real_character.get("name") == "Imp")
     is_jasnowidz = bool(real_character and real_character.get("name") == "Jasnowidz")
+    is_truciciel = bool(real_character and real_character.get("name") == "Truciciel")
 
     night_players = []
     for listed_client_id, player in sorted(db_players.get_all().items(), key=lambda item: item[1].get("seat") or 9999):
@@ -1005,6 +1168,10 @@ def player_page():
     jasnowidz_used_today = False
     if is_jasnowidz:
         jasnowidz_used_today = real_character.get("jasnowidz_last_day_used") == db_game.get("day_number", 1)
+
+    truciciel_used_today = False
+    if is_truciciel:
+        truciciel_used_today = real_character.get("truciciel_last_day_used") == db_game.get("day_number", 1)
 
     if real_character and real_character.get("name") == "Pijak":
         print(
@@ -1027,6 +1194,8 @@ def player_page():
         is_imp=is_imp,
         is_jasnowidz=is_jasnowidz,
         jasnowidz_used_today=jasnowidz_used_today,
+        is_truciciel=is_truciciel,
+        truciciel_used_today=truciciel_used_today,
         night_players=night_players,
         is_admin=(client_id == db_game.get("admin_id")),
         liczba_graczy=len(db_players),
@@ -1051,7 +1220,7 @@ def update_player(client_id):
         "player_status": get_stable_player_status(visible_character),
         "player_info": visible_character["player_info"],
         "player_image": f"/static/images/{visible_character['file']}",
-        "player_link": f"/player/{client_id}"
+        "player_link": url_for("postac", route=visible_character["route"], back="player_page")
     }, to=db_players[client_id].sid)
 
 

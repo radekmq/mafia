@@ -5,6 +5,12 @@
 {% block content %}
 <script id="modeStateData" type="application/json">{{ {"mode": current_mode} | tojson }}</script>
 
+<div style="display:flex; justify-content:center; margin-bottom: 12px;">
+  <button type="button" data-href="{{ url_for('handle_wiki', back='player_page') }}" onclick="window.location.href=this.dataset.href">
+    Wiki z listą postaci
+  </button>
+</div>
+
 {% if is_admin %}
 <div class="container" id="adminCombinedPanel" style="margin-bottom: 16px;">
   <h3 style="text-align:center; margin-top: 0;">Panel administratora</h3>
@@ -171,14 +177,35 @@
     </button>
   </div>
   {% endif %}
+
+  {% if is_truciciel %}
+  <div id="trucicielControls" style="margin-top: 20px;">
+    <p><strong>Dzień {{ day_number }}</strong></p>
+    <p id="trucicielError" style="color: red; font-weight: bold;"></p>
+    <p id="trucicielInfo" style="font-weight: bold;"></p>
+
+    <label for="trucicielTarget">Wybierz gracza do zatrucia (aktywnie od kolejnego dnia):</label>
+    <select id="trucicielTarget">
+      {% for player in night_players %}
+      <option value="{{ player.client_id }}">{{ player.name }}{% if player.seat %} (miejsce {{ player.seat }}){% endif %}</option>
+      {% endfor %}
+    </select>
+
+    <button id="trucicielPoisonBtn" type="button" {% if truciciel_used_today or is_executed %}disabled{% endif %}>
+      Zatruj od kolejnego dnia
+    </button>
+  </div>
+  {% endif %}
 </div>
 
 <script id="playerStateData" type="application/json">{{ {"clientId": client_id, "executed": is_executed, "voteDead": vote_dead} | tojson }}</script>
 <script id="jasnowidzStateData" type="application/json">{{ {"isJasnowidz": is_jasnowidz, "usedToday": jasnowidz_used_today} | tojson }}</script>
+<script id="trucicielStateData" type="application/json">{{ {"isTruciciel": is_truciciel, "usedToday": truciciel_used_today} | tojson }}</script>
 
 <script>
   const playerState = JSON.parse(document.getElementById("playerStateData").textContent);
   const jasnowidzState = JSON.parse(document.getElementById("jasnowidzStateData").textContent);
+  const trucicielState = JSON.parse(document.getElementById("trucicielStateData").textContent);
 
   const nominateBtn = document.getElementById("nominateBtn");
   const nominationPanel = document.getElementById("nominationPanel");
@@ -197,6 +224,11 @@
   const jasnowidzAskBtn = document.getElementById("jasnowidzAskBtn");
   const jasnowidzFirstTarget = document.getElementById("jasnowidzFirstTarget");
   const jasnowidzSecondTarget = document.getElementById("jasnowidzSecondTarget");
+
+  const trucicielError = document.getElementById("trucicielError");
+  const trucicielInfo = document.getElementById("trucicielInfo");
+  const trucicielPoisonBtn = document.getElementById("trucicielPoisonBtn");
+  const trucicielTarget = document.getElementById("trucicielTarget");
 
   let hasSubmittedVote = false;
 
@@ -280,6 +312,34 @@
         clientId: playerState.clientId,
         first_target_client_id: firstTarget,
         second_target_client_id: secondTarget,
+      });
+    });
+  }
+
+  if (trucicielState.isTruciciel && trucicielPoisonBtn) {
+    if (trucicielState.usedToday && trucicielInfo) {
+      trucicielInfo.textContent = "Dzisiejsze zatrucie Truciciela zostało już wykorzystane.";
+    }
+
+    bindTap(trucicielPoisonBtn, () => {
+      const targetClientId = trucicielTarget.value;
+      if (!targetClientId) {
+        if (trucicielError) {
+          trucicielError.textContent = "Wybierz gracza do zatrucia.";
+        }
+        return;
+      }
+
+      if (trucicielError) {
+        trucicielError.textContent = "";
+      }
+      if (trucicielInfo) {
+        trucicielInfo.textContent = "Wysyłanie akcji...";
+      }
+
+      socket.emit("truciciel_day_action", {
+        clientId: playerState.clientId,
+        target_client_id: targetClientId,
       });
     });
   }
@@ -409,6 +469,30 @@
     jasnowidzInfo.textContent = data.message || "Akcja Jasnowidza wykonana.";
     if (jasnowidzAskBtn) {
       jasnowidzAskBtn.disabled = true;
+    }
+    refreshPlayerPage();
+  });
+
+  socket.on("truciciel_action_error", data => {
+    if (!trucicielState.isTruciciel || !trucicielError) {
+      return;
+    }
+    trucicielError.textContent = data.error || "Nie udało się wykonać akcji Truciciela.";
+    if (trucicielInfo) {
+      trucicielInfo.textContent = "";
+    }
+  });
+
+  socket.on("truciciel_action_result", data => {
+    if (!trucicielState.isTruciciel || !trucicielInfo) {
+      return;
+    }
+    if (trucicielError) {
+      trucicielError.textContent = "";
+    }
+    trucicielInfo.textContent = data.message || "Akcja Truciciela wykonana.";
+    if (trucicielPoisonBtn) {
+      trucicielPoisonBtn.disabled = true;
     }
     refreshPlayerPage();
   });

@@ -84,18 +84,39 @@ db_characters = {
     ],
     "Outsiderzy": [
         # {"client_id": None, "name": "Lokaj", "file": "lokaj.png", "route": "lokaj", "player_status": fun_lokaj, "player_info": "TBD"},
-        {"client_id": None, "name": "Pijak", "file": "pijak.png", "route": "pijak", "player_status": fun_pijak, "player_info": "TBD"},
+        {
+            "client_id": None, 
+            "name": "Pijak", 
+            "file": "pijak.png", 
+            "route": "pijak", 
+            "player_status": fun_pijak, 
+            "player_info": "Nie wiesz, że jesteś Pijakiem. Myślisz, że jesteś postacią z grupy Townsfolk, ale nią nie jesteś."
+        },
         # {"client_id": None, "name": "Samotnik", "file": "samotnik.png", "route": "samotnik", "player_status": fun_samotnik, "player_info": "TBD"},
         # {"client_id": None, "name": "Święty", "file": "swiety.png", "route": "swiety", "player_status": fun_swiety, "player_info": "TBD"},
     ],
     "Minionki": [
-        {"client_id": None, "name": "Truciciel", "file": "truciciel.png", "route": "truciciel", "player_status": fun_truciciel, "player_info": "TBD"},
+        {
+            "client_id": None, 
+            "name": "Truciciel", 
+            "file": "truciciel.png", 
+            "route": "truciciel", 
+            "player_status": fun_truciciel, 
+            "player_info": "Każdego dnia wybierz gracza: tej nocy i następnego dnia ten gracz jest zatruty. Truciciel potajemnie zakłóca działanie zdolności postaci."
+        },
         # {"client_id": None, "name": "Szpieg", "file": "szpieg.png", "route": "szpieg", "player_status": fun_szpieg, "player_info": "TBD"},
         # {"client_id": None, "name": "Scarlet Woman", "file": "scarlet.png", "route": "scarlet", "player_status": fun_scarlet, "player_info": "TBD"},
         # {"client_id": None, "name": "Baron", "file": "baron.png", "route": "baron", "player_status": fun_baron, "player_info": "TBD"},
     ],
     "Demon": [
-        {"client_id": None, "name": "Imp", "file": "imp.png", "route": "imp", "player_status": fun_imp, "player_info": "TBD"},
+        {
+            "client_id": None, 
+            "name": "Imp", 
+            "file": "imp.png", 
+            "route": "imp", 
+            "player_status": fun_imp, 
+            "player_info": "TBD"
+        },
     ]
 }
 

@@ -290,8 +290,14 @@ def assign_players_to_characters(client_ids, trouble_brewing_setup, db_character
         print(f"{category.upper()}")
         print(f"{'=' * 50}")
         for c in chars:
+            player_name = "Nieznany"
+            if players_db and c.get("client_id") in players_db:
+                player_name = players_db[c["client_id"]].get("name", "Nieznany")
             extra_info = f" (druga_postac: {c.get('druga_postac')})" if "druga_postac" in c else ""
-            print(f"{c['name']:20} | gracz: {c['client_id']} | numer_siedzenia: {c['numer_siedzenia']}{extra_info}")
+            print(
+                f"{c['name']:20} | gracz: {c['client_id']} ({player_name}) | "
+                f"numer_siedzenia: {c['numer_siedzenia']}{extra_info}"
+            )
 
     return new_db_characters
 
@@ -314,8 +320,13 @@ def fun_praczka(characters, players, drunk=False):
     print(characters)
     all_chars = [c for chars in characters.values() for c in chars]
     mieszkancy = characters.get("Mieszkańcy", [])
-    assigned_chars = [c for c in all_chars if c.get("client_id") in players]
-    assigned_mieszkancy = [c for c in mieszkancy if c.get("client_id") in players]
+    # Bierz pod uwage tylko postacie realnie uczestniczace w grze (z numerem miejsca).
+    assigned_chars = [
+        c for c in all_chars if c.get("client_id") in players and c.get("numer_siedzenia") is not None
+    ]
+    assigned_mieszkancy = [
+        c for c in mieszkancy if c.get("client_id") in players and c.get("numer_siedzenia") is not None
+    ]
 
     if not assigned_mieszkancy or len(assigned_chars) < 2:
         return "Brak wystarczającej liczby postaci do losowania."
@@ -389,8 +400,13 @@ def fun_bibliotekarka(characters, players, drunk=False):
 
     all_chars = [c for chars in characters.values() for c in chars]
     outsiderzy = characters.get("Outsiderzy", [])
-    assigned_chars = [c for c in all_chars if c.get("client_id") in players]
-    assigned_outsiderzy = [c for c in outsiderzy if c.get("client_id") in players]
+    # Bierz pod uwage tylko postacie realnie uczestniczace w grze (z numerem miejsca).
+    assigned_chars = [
+        c for c in all_chars if c.get("client_id") in players and c.get("numer_siedzenia") is not None
+    ]
+    assigned_outsiderzy = [
+        c for c in outsiderzy if c.get("client_id") in players and c.get("numer_siedzenia") is not None
+    ]
 
     if len(players) < 2:
         return "Brak wystarczającej liczby graczy do losowania."
@@ -444,14 +460,7 @@ def fun_bibliotekarka(characters, players, drunk=False):
                 f"ma postać: {outsider['name']}"
             )
         else:
-            wszyscy_gracze = list(players.get_all().values())
-            losowi_gracze = random.sample(wszyscy_gracze, 2)
-            name1, name2 = losowi_gracze[0]["name"], losowi_gracze[1]["name"]
-
-            tekst = (
-                f"Żaden Outsider nie jest w grze. "
-                f"Przykładowi gracze: {name1} oraz {name2}."
-            )
+            tekst = "Żaden Outsider nie jest w grze."
 
     return tekst
 
@@ -713,45 +722,55 @@ def fun_samotnik(characters, players, drunk=False, poisoned=False):
 def fun_swiety(characters, players, drunk=False, poisoned=False):
     return "Na razie nic."
 
-def fun_truciciel(characters, players, drunk=False, poisoned=False):
+def fun_truciciel(characters, players, drunk=False, poisoned=False, mode="day", day_number=1):
     """
-    Funkcja dla postaci 'Truciciel'.
-    Tworzy listę możliwych celów spośród Mieszkańców i Outsiderów,
-    a następnie losuje jedną postać jako wybrany cel.
+    Funkcja statusu Truciciela.
+    Truciciel wybiera cel w dzień, a zatrucie staje się aktywne dopiero kolejnego dnia.
     """
 
-    _ = drunk  # Parametr zachowany dla spójności sygnatur postaci.
+    _ = drunk
     _ = poisoned
 
     all_players = players.get_all()
     if not all_players:
         return "Brak graczy w bazie."
 
-    possible_targets = []
-    for category in ["Mieszkańcy", "Outsiderzy"]:
-        for char in characters.get(category, []):
-            client_id = char.get("client_id")
-            if client_id in all_players:
-                player_name = all_players[client_id].get("name", "Nieznany")
-                possible_targets.append(
-                    {
-                        "client_id": client_id,
-                        "player_name": player_name,
-                        "role_name": char.get("name", "Nieznana postać"),
-                    }
-                )
+    truciciel_character = None
+    for char in characters.get("Minionki", []):
+        if char.get("name") == "Truciciel" and char.get("client_id") in all_players:
+            truciciel_character = char
+            break
 
-    if not possible_targets:
-        return "Brak dostępnych celów dla Truciciela (Mieszkańcy/Outsiderzy)."
+    if not truciciel_character:
+        return "Truciciel nie jest w tej grze."
 
-    chosen_target = random.choice(possible_targets)
-    options_text = ", ".join(target["player_name"] for target in possible_targets)
+    poison_targets_by_day = truciciel_character.get("truciciel_poison_targets_by_day", {})
+    active_target_id = poison_targets_by_day.get(str(day_number))
+    next_target_id = poison_targets_by_day.get(str(day_number + 1))
 
-    return (
-        f"Możliwe cele Truciciela: {options_text}. "
-        f"Wybrany cel: {chosen_target['player_name']} "
-        f"(postać: {chosen_target['role_name']})."
-    )
+    def target_name(client_id):
+        if not client_id:
+            return "brak"
+        return all_players.get(client_id, {}).get("name", "Nieznany")
+
+    status_lines = []
+
+    if mode == "day":
+        if truciciel_character.get("truciciel_last_day_used") == day_number:
+            status_lines.append(
+                f"Dzisiejszy wybór zapisany. Cel na kolejny dzień: {target_name(next_target_id)}."
+            )
+        else:
+            status_lines.append("Wybierz w tym dniu cel zatrucia.")
+
+    if active_target_id:
+        status_lines.append(
+            f"Aktywne zatrucie (dzień {day_number}): {target_name(active_target_id)}."
+        )
+    else:
+        status_lines.append(f"Aktywne zatrucie (dzień {day_number}): brak.")
+
+    return " ".join(status_lines)
 
 def fun_szpieg(characters, players, drunk=False, poisoned=False):
     return "Na razie nic."
@@ -819,8 +838,8 @@ def fun_imp(characters, players, drunk=False, poisoned=False, mode="day"):
         extra_roles_info = "Brak dostępnych postaci do podania."
 
     status_lines = [
-        f"Minionki w grze: {minions_info}.",
-        f"3 postacie dla Impa: {extra_roles_info}.",
+        f"Minionki w grze (Twoi sojusznicy): {minions_info}.",
+        f"Tych trzech mieszkańców nie bierze udziału w grze (możesz udawać, że jesteś jednym z nich): {extra_roles_info}.",
     ]
 
     if mode == "night":

@@ -327,9 +327,15 @@ def fun_praczka(characters, players, drunk=False):
     assigned_mieszkancy = [
         c for c in mieszkancy if c.get("client_id") in players and c.get("numer_siedzenia") is not None
     ]
+    assigned_mieszkancy_without_praczka = [
+        c for c in assigned_mieszkancy if c.get("name") != "Praczka"
+    ]
 
     if not assigned_mieszkancy or len(assigned_chars) < 2:
         return "Brak wystarczającej liczby postaci do losowania."
+
+    if not assigned_mieszkancy_without_praczka:
+        return "Brak odpowiedniej postaci mieszkańca do informacji Praczki."
 
     def safe_player_name(client_id):
         if not client_id or client_id not in players:
@@ -344,7 +350,7 @@ def fun_praczka(characters, players, drunk=False):
         if len(players) < 2:
             return "Brak wystarczającej liczby graczy do losowania."
 
-        mieszkaniec = random.choice(assigned_mieszkancy)
+        mieszkaniec = random.choice(assigned_mieszkancy_without_praczka)
         losowi_gracze = random.sample(list(players.get_all().values()), 2)
         name1, name2 = losowi_gracze[0]["name"], losowi_gracze[1]["name"]
 
@@ -355,7 +361,7 @@ def fun_praczka(characters, players, drunk=False):
 
     else:
         # --- Tryb normalny ---
-        mieszkaniec = random.choice(assigned_mieszkancy)
+        mieszkaniec = random.choice(assigned_mieszkancy_without_praczka)
         mieszkaniec_client_id = mieszkaniec.get("client_id")
         kandydaci = [
             c

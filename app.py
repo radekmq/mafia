@@ -4,6 +4,7 @@ from flask_socketio import SocketIO, join_room, leave_room, emit
 from uuid import uuid4
 from utils import Database, assign_players_to_characters, fun_praczka
 import random
+import inspect
 
 from database import db_characters, trouble_brewing_setup
 
@@ -18,9 +19,11 @@ db_game = {
     "game_active": False,
     "char_presented": False,
     "mode": "day",
+    "day_number": 1,
     "no_of_players": 0,
     "admin_id": None,
-    "players": []
+    "players": [],
+    "winner": None,
 }
 db_game_selection = None
 
@@ -103,7 +106,25 @@ def build_game_status_payload():
         "game_active": db_game["game_active"],
         "char_presented": db_game["char_presented"],
         "mode": db_game["mode"],
+        "day_number": db_game.get("day_number", 1),
+        "winner": db_game.get("winner"),
     }
+
+
+def check_and_announce_evil_win_if_needed():
+    if db_game.get("winner"):
+        return True
+
+    alive_players = get_alive_player_ids()
+    if len(alive_players) > 2:
+        return False
+
+    db_game["winner"] = "evil"
+    db_game["game_active"] = False
+    message = "W grze pozostało tylko 2 żywych graczy. Wygrywają Źli (Minionki + Imp)."
+    socketio.emit("game_over", {"winner": "evil", "message": message})
+    socketio.emit("update_game_status", build_game_status_payload())
+    return True
 
 
 def reset_execution_vote_state():
@@ -189,6 +210,8 @@ def finalize_execution_vote_if_ready(force=False):
 
     emit_execution_vote_result(message, yes_votes, no_votes, player_executed)
     reset_execution_vote_state()
+    if player_executed:
+        check_and_announce_evil_win_if_needed()
 
 
 def handle_player_removed_from_execution_vote(client_id):
@@ -407,6 +430,149 @@ def handle_cast_execution_vote(data):
 
     execution_vote_state["votes"][voter_client_id] = vote
     finalize_execution_vote_if_ready()
+
+
+@socketio.on("imp_night_action")
+def handle_imp_night_action(data):
+    actor_client_id = data.get("clientId") or data.get("client_id")
+    target_client_id = data.get("target_client_id")
+
+    if not db_game_selection:
+        emit("imp_action_error", {"error": "Brak aktywnej rozgrywki."})
+        return
+
+    if db_game.get("mode") != "night":
+        emit("imp_action_error", {"error": "Akcja Impa jest dostępna tylko w nocy."})
+        return
+
+    if not actor_client_id or actor_client_id not in db_players:
+        emit("imp_action_error", {"error": "Nie znaleziono gracza wykonującego akcję."})
+        return
+
+    if not target_client_id or target_client_id not in db_players:
+        emit("imp_action_error", {"error": "Nie znaleziono wybranego celu."})
+        return
+
+    ensure_player_flags(db_players[actor_client_id])
+    if db_players[actor_client_id]["executed"]:
+        emit("imp_action_error", {"error": "Wyeliminowany Imp nie może wykonać akcji."})
+        return
+
+    real_character, _ = get_player_character_views(actor_client_id)
+    if not real_character or real_character.get("name") != "Imp":
+        emit("imp_action_error", {"error": "Tylko Imp może wykonać tę akcję."})
+        return
+
+    imp_character = None
+    for char in db_game_selection.get("Demon", []):
+        if char.get("name") == "Imp" and char.get("client_id") == actor_client_id:
+            imp_character = char
+            break
+
+    if not imp_character:
+        emit("imp_action_error", {"error": "Nie znaleziono aktywnej postaci Impa."})
+        return
+
+    swap_message = ""
+    if target_client_id == actor_client_id:
+        minion_candidates = [
+            char for char in db_game_selection.get("Minionki", [])
+            if char.get("client_id") in db_players and char.get("client_id") != actor_client_id
+        ]
+        if minion_candidates:
+            chosen_minion = random.choice(minion_candidates)
+            chosen_minion_client_id = chosen_minion.get("client_id")
+            imp_character["client_id"], chosen_minion["client_id"] = (
+                chosen_minion_client_id,
+                actor_client_id,
+            )
+            swap_message = (
+                " Wybrałeś siebie - nastąpiła losowa zamiana ról Impa i Minionka "
+                f"z graczem {db_players[actor_client_id].get('name', 'Nieznany')} "
+                f"oraz {db_players[chosen_minion_client_id].get('name', 'Nieznany')}."
+            )
+
+    ensure_player_flags(db_players[target_client_id])
+    db_players[target_client_id]["executed"] = True
+
+    for group_chars in db_game_selection.values():
+        for char in group_chars:
+            char.pop("resolved_player_status", None)
+
+    target_name = db_players[target_client_id].get("name", "Nieznany")
+    result_message = f"Akcja Impa wykonana. Wyeliminowano gracza: {target_name}.{swap_message}"
+    emit("imp_action_result", {"message": result_message})
+    socketio.emit("force_player_page_refresh", {})
+    check_and_announce_evil_win_if_needed()
+
+
+@socketio.on("jasnowidz_day_action")
+def handle_jasnowidz_day_action(data):
+    actor_client_id = data.get("clientId") or data.get("client_id")
+    first_target_client_id = data.get("first_target_client_id")
+    second_target_client_id = data.get("second_target_client_id")
+
+    if not db_game_selection:
+        emit("jasnowidz_action_error", {"error": "Brak aktywnej rozgrywki."})
+        return
+
+    if db_game.get("mode") != "day":
+        emit("jasnowidz_action_error", {"error": "Akcja Jasnowidza jest dostępna tylko w dzień."})
+        return
+
+    if not actor_client_id or actor_client_id not in db_players:
+        emit("jasnowidz_action_error", {"error": "Nie znaleziono gracza wykonującego akcję."})
+        return
+
+    if not first_target_client_id or first_target_client_id not in db_players:
+        emit("jasnowidz_action_error", {"error": "Nie znaleziono pierwszego celu."})
+        return
+
+    if not second_target_client_id or second_target_client_id not in db_players:
+        emit("jasnowidz_action_error", {"error": "Nie znaleziono drugiego celu."})
+        return
+
+    if first_target_client_id == second_target_client_id:
+        emit("jasnowidz_action_error", {"error": "Wybierz dwóch różnych graczy."})
+        return
+
+    ensure_player_flags(db_players[actor_client_id])
+    if db_players[actor_client_id]["executed"]:
+        emit("jasnowidz_action_error", {"error": "Wyeliminowany Jasnowidz nie może wykonać akcji."})
+        return
+
+    real_character, _ = get_player_character_views(actor_client_id)
+    if not real_character or real_character.get("name") != "Jasnowidz":
+        emit("jasnowidz_action_error", {"error": "Tylko Jasnowidz może wykonać tę akcję."})
+        return
+
+    day_number = db_game.get("day_number", 1)
+    if real_character.get("jasnowidz_last_day_used") == day_number:
+        emit("jasnowidz_action_error", {"error": "Dzisiaj wykorzystałeś już pytanie Jasnowidza."})
+        return
+
+    imp_client_ids = {
+        char.get("client_id")
+        for char in db_game_selection.get("Demon", [])
+        if char.get("name") == "Imp" and char.get("client_id") in db_players
+    }
+
+    target_pair = {first_target_client_id, second_target_client_id}
+    has_imp = any(client_id in imp_client_ids for client_id in target_pair)
+    answer = "TAK" if has_imp else "NIE"
+
+    first_name = db_players[first_target_client_id].get("name", "Nieznany")
+    second_name = db_players[second_target_client_id].get("name", "Nieznany")
+    result_message = (
+        f"Pytanie o parę ({first_name}, {second_name}) -> Czy jest tam Imp? {answer}."
+    )
+
+    real_character["jasnowidz_last_day_used"] = day_number
+    real_character["jasnowidz_daily_result"] = result_message
+    real_character.pop("resolved_player_status", None)
+
+    emit("jasnowidz_action_result", {"message": result_message})
+    emit("force_player_page_refresh", {})
         
 @app.route("/")
 def index():
@@ -516,6 +682,8 @@ def game_status():
         "game_active": db_game["game_active"],
         "char_presented": db_game["char_presented"],
         "mode": db_game["mode"],
+        "day_number": db_game.get("day_number", 1),
+        "winner": db_game.get("winner"),
         "is_player": is_player,
     }), 200
 
@@ -544,10 +712,13 @@ def set_game_mode():
     if mode not in {"day", "night"}:
         return jsonify({"error": "Nieprawidłowy tryb gry."}), 400
 
-    if previous_mode == "day" and mode == "night" and db_game_selection:
+    if previous_mode == "night" and mode == "day":
+        db_game["day_number"] = db_game.get("day_number", 1) + 1
+
+    if previous_mode != mode and db_game_selection:
         for characters in db_game_selection.values():
             for character in characters:
-                if character.get("name") == "Empata":
+                if character.get("name") in {"Empata", "Imp", "Jasnowidz"}:
                     character.pop("resolved_player_status", None)
 
     db_game["mode"] = mode
@@ -563,6 +734,8 @@ def create():
         if event == "create":
             db_game["game_active"] = True
             db_game["no_of_players"] = len(db_players)
+            db_game["winner"] = None
+            db_game["day_number"] = 1
             
             socketio.emit("update_game_status", { 
                                                 "no_of_players": db_game["no_of_players"], 
@@ -578,6 +751,8 @@ def create():
 
             db_game["char_presented"] = True
             db_game["no_of_players"] = len(db_players)
+            db_game["winner"] = None
+            db_game["day_number"] = 1
             socketio.emit("update_game_status", { 
                                                 "no_of_players": db_game["no_of_players"], 
                                                 "game_status": "Postacie zostały rozlosowane.",
@@ -679,6 +854,19 @@ def get_player_character_views(client_id):
             break
 
     if not real_character:
+        for char in assigned_characters:
+            if char.get("name") == "Imp":
+                real_character = char
+                break
+
+    if real_character and real_character.get("name") == "Imp":
+        print(
+            "[get_player_character_views] Imp priority role view "
+            f"client_id={client_id}, role={real_character.get('name')}"
+        )
+        return real_character, real_character
+
+    if not real_character:
         real_character = assigned_characters[0]
         print(
             "[get_player_character_views] Standard role view "
@@ -718,7 +906,17 @@ def get_stable_player_status(character):
 
     player_status_field = character.get("player_status")
     if callable(player_status_field):
-        resolved_status = player_status_field(db_game_selection, db_players)
+        kwargs = {}
+        try:
+            signature = inspect.signature(player_status_field)
+            if "mode" in signature.parameters:
+                kwargs["mode"] = db_game.get("mode", "day")
+            if "day_number" in signature.parameters:
+                kwargs["day_number"] = db_game.get("day_number", 1)
+        except (TypeError, ValueError):
+            kwargs = {}
+
+        resolved_status = player_status_field(db_game_selection, db_players, **kwargs)
     elif isinstance(player_status_field, str):
         resolved_status = player_status_field
     else:
@@ -769,6 +967,24 @@ def player_page():
     player_image = f"/static/images/{visible_character['file']}"
     player_link = f"/player/{client_id}"
     ensure_player_flags(db_players[client_id])
+    is_imp = bool(real_character and real_character.get("name") == "Imp")
+    is_jasnowidz = bool(real_character and real_character.get("name") == "Jasnowidz")
+
+    night_players = []
+    for listed_client_id, player in sorted(db_players.get_all().items(), key=lambda item: item[1].get("seat") or 9999):
+        ensure_player_flags(player)
+        night_players.append(
+            {
+                "client_id": listed_client_id,
+                "name": player.get("name", "Nieznany"),
+                "seat": player.get("seat"),
+                "executed": player.get("executed", False),
+            }
+        )
+
+    jasnowidz_used_today = False
+    if is_jasnowidz:
+        jasnowidz_used_today = real_character.get("jasnowidz_last_day_used") == db_game.get("day_number", 1)
 
     if real_character and real_character.get("name") == "Pijak":
         print(
@@ -787,6 +1003,11 @@ def player_page():
         vote_dead=db_players[client_id]["vote_dead"],
         is_night=(db_game.get("mode") == "night"),
         current_mode=db_game.get("mode", "day"),
+        day_number=db_game.get("day_number", 1),
+        is_imp=is_imp,
+        is_jasnowidz=is_jasnowidz,
+        jasnowidz_used_today=jasnowidz_used_today,
+        night_players=night_players,
     )
     
 def update_player(client_id):  

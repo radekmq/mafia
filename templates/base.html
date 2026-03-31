@@ -149,6 +149,8 @@
       box-shadow: 0 3px 6px rgba(0,0,0,0.15);
       cursor: pointer;
       transition: all 0.2s ease-in-out;
+      touch-action: manipulation;
+      -webkit-tap-highlight-color: transparent;
     }
 
     button:hover {
@@ -247,6 +249,11 @@
 
     socket.on("disconnect", () => {
       console.warn("Rozłączono z serwerem");
+    });
+
+    socket.on("game_over", data => {
+      const message = (data && data.message) ? data.message : "Koniec gry.";
+      alert(message);
     });
   </script>
 </head>

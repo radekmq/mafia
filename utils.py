@@ -453,7 +453,7 @@ def fun_bibliotekarka(characters, players, drunk=False):
 
     return tekst
 
-def fun_detektyw(characters, players):
+def fun_detektyw(characters, players, drunk=False, poisoned=False):
     """
     Funkcja dla postaci 'Detektyw'.
     Informuje, że 1 z 2 graczy ma konkretną postać Miniona.
@@ -507,7 +507,7 @@ def fun_detektyw(characters, players):
         f"Przykładowi gracze: {name1} oraz {name2}."
     )
 
-def fun_kucharz(characters, players, drunk=False):
+def fun_kucharz(characters, players, drunk=False, poisoned=False):
     """
     Funkcja dla postaci 'Kucharz'.
     Informuje, ile par złych postaci (Minionki lub Demon) siedzi obok siebie.
@@ -524,7 +524,7 @@ def fun_kucharz(characters, players, drunk=False):
         if char.get("client_id") in players
     }
 
-    if drunk:
+    if drunk or poisoned:
         max_pairs = (len(bad_client_ids) // 2) + 1
         return f"Liczba par złych postaci siedzących obok siebie: {random.randint(0, max_pairs)}."
 
@@ -553,7 +553,7 @@ def fun_kucharz(characters, players, drunk=False):
 
     return f"Liczba par złych postaci siedzących obok siebie: {bad_pairs}."
 
-def fun_empata(characters, players):
+def fun_empata(characters, players, drunk=False, poisoned=False):
     """
     Funkcja dla postaci 'Empata'.
     Zwraca liczbę złych sąsiadów (Minionki + Demon), pomijając sąsiadów z executed=True.
@@ -562,6 +562,12 @@ def fun_empata(characters, players):
     all_players = players.get_all()
     if len(all_players) < 3:
         return "Brak wystarczającej liczby graczy do działania Empaty."
+
+    if drunk or poisoned:
+        return (
+            "Liczba żyjących złych sąsiadów Empaty "
+            f"(Minionki + Demon): {random.randint(0, 2)}."
+        )
 
     empath_character = None
     for char in characters.get("Mieszkańcy", []):
@@ -629,53 +635,197 @@ def fun_empata(characters, players):
         f"(Minionki + Demon): {evil_neighbors}."
     )
 
-def fun_jasnowidz(characters, players):
+def fun_jasnowidz(characters, players, drunk=False, poisoned=False, mode="day", day_number=1):
+    """
+    Funkcja dla postaci 'Jasnowidz'.
+    Jasnowidz raz dziennie wybiera 2 graczy i dostaje odpowiedź,
+    czy w tej parze znajduje się Demon (Imp).
+    """
+
+    _ = drunk
+    _ = poisoned
+
+    all_players = players.get_all()
+    if not all_players:
+        return "Brak graczy w bazie."
+
+    jasnowidz_character = None
+    for char in characters.get("Mieszkańcy", []):
+        if char.get("name") == "Jasnowidz" and char.get("client_id") in all_players:
+            jasnowidz_character = char
+            break
+
+    if not jasnowidz_character:
+        return "Jasnowidz nie jest w tej grze."
+
+    if mode != "day":
+        return "Akcja Jasnowidza jest dostępna tylko w ciągu dnia."
+
+    used_day = jasnowidz_character.get("jasnowidz_last_day_used")
+    last_result = jasnowidz_character.get("jasnowidz_daily_result")
+
+    if used_day == day_number:
+        if last_result:
+            return f"Dzisiejsza odpowiedź Jasnowidza: {last_result}"
+        return "Dzisiaj wykorzystałeś już pytanie Jasnowidza."
+
+    players_hint = ", ".join(
+        player.get("name", "Nieznany")
+        for _, player in sorted(all_players.items(), key=lambda item: item[1].get("seat") or 9999)
+    )
+    return (
+        "Wybierz 2 dowolnych graczy, aby sprawdzić czy w tej parze jest Imp. "
+        f"Dostępni gracze: {players_hint}."
+    )
+
+def fun_grabarz(characters, players, drunk=False, poisoned=False):
     return "Na razie nic."
 
-def fun_grabarz(characters, players):
+def fun_mnich(characters, players, drunk=False, poisoned=False):
     return "Na razie nic."
 
-def fun_mnich(characters, players):
+def fun_krukopiek(characters, players, drunk=False, poisoned=False):
     return "Na razie nic."
 
-def fun_krukopiek(characters, players):
+def fun_dziewica(characters, players, drunk=False, poisoned=False):
     return "Na razie nic."
 
-def fun_dziewica(characters, players):
+def fun_zabojca(characters, players, drunk=False, poisoned=False):
     return "Na razie nic."
 
-def fun_zabojca(characters, players):
+def fun_zolnierz(characters, players, drunk=False, poisoned=False):
     return "Na razie nic."
 
-def fun_zolnierz(characters, players):
+def fun_burmistrz(characters, players, drunk=False, poisoned=False):
     return "Na razie nic."
 
-def fun_burmistrz(characters, players):
+def fun_lokaj(characters, players, drunk=False, poisoned=False):
     return "Na razie nic."
 
-def fun_lokaj(characters, players):
+def fun_pijak(characters, players, drunk=False, poisoned=False):
     return "Na razie nic."
 
-def fun_pijak(characters, players):
+def fun_samotnik(characters, players, drunk=False, poisoned=False):
     return "Na razie nic."
 
-def fun_samotnik(characters, players):
+def fun_swiety(characters, players, drunk=False, poisoned=False):
     return "Na razie nic."
 
-def fun_swiety(characters, players):
+def fun_truciciel(characters, players, drunk=False, poisoned=False):
+    """
+    Funkcja dla postaci 'Truciciel'.
+    Tworzy listę możliwych celów spośród Mieszkańców i Outsiderów,
+    a następnie losuje jedną postać jako wybrany cel.
+    """
+
+    _ = drunk  # Parametr zachowany dla spójności sygnatur postaci.
+    _ = poisoned
+
+    all_players = players.get_all()
+    if not all_players:
+        return "Brak graczy w bazie."
+
+    possible_targets = []
+    for category in ["Mieszkańcy", "Outsiderzy"]:
+        for char in characters.get(category, []):
+            client_id = char.get("client_id")
+            if client_id in all_players:
+                player_name = all_players[client_id].get("name", "Nieznany")
+                possible_targets.append(
+                    {
+                        "client_id": client_id,
+                        "player_name": player_name,
+                        "role_name": char.get("name", "Nieznana postać"),
+                    }
+                )
+
+    if not possible_targets:
+        return "Brak dostępnych celów dla Truciciela (Mieszkańcy/Outsiderzy)."
+
+    chosen_target = random.choice(possible_targets)
+    options_text = ", ".join(target["player_name"] for target in possible_targets)
+
+    return (
+        f"Możliwe cele Truciciela: {options_text}. "
+        f"Wybrany cel: {chosen_target['player_name']} "
+        f"(postać: {chosen_target['role_name']})."
+    )
+
+def fun_szpieg(characters, players, drunk=False, poisoned=False):
     return "Na razie nic."
 
-def fun_truciciel(characters, players):
+def fun_scarlet(characters, players, drunk=False, poisoned=False):
     return "Na razie nic."
 
-def fun_szpieg(characters, players):
+def fun_baron(characters, players, drunk=False, poisoned=False):
     return "Na razie nic."
 
-def fun_scarlet(characters, players):
-    return "Na razie nic."
+def fun_imp(characters, players, drunk=False, poisoned=False, mode="day"):
+    """
+    Funkcja dla postaci 'Imp'.
+    Na start zwraca stałe informacje:
+    - lista graczy będących Minionkami,
+    - lista 3 postaci przygotowanych dla Impa (jeśli dostępne).
+    W nocy dodatkowo pokazuje listę wszystkich graczy.
+    """
 
-def fun_baron(characters, players):
-    return "Na razie nic."
+    _ = drunk
+    _ = poisoned
 
-def fun_imp(characters, players):
-    return "Na razie nic."
+    all_players = players.get_all()
+    if not all_players:
+        return "Brak graczy w bazie."
+
+    imp_character = None
+    for char in characters.get("Demon", []):
+        if char.get("name") == "Imp" and char.get("client_id") in all_players:
+            imp_character = char
+            break
+
+    if not imp_character:
+        return "Imp nie jest w tej grze."
+
+    minion_names = []
+    for minion in characters.get("Minionki", []):
+        minion_client_id = minion.get("client_id")
+        if minion_client_id in all_players:
+            minion_names.append(all_players[minion_client_id].get("name", "Nieznany"))
+
+    if minion_names:
+        minions_info = ", ".join(minion_names)
+    else:
+        minions_info = "Brak Minionów w tej rozgrywce."
+
+    imp_extra_roles = imp_character.get("druga_postac")
+    if isinstance(imp_extra_roles, list) and imp_extra_roles:
+        extra_roles = imp_extra_roles[:3]
+    else:
+        unassigned_roles = []
+        for group_chars in characters.values():
+            for char in group_chars:
+                if char.get("client_id") is None:
+                    unassigned_roles.append(char.get("name", "Nieznana postać"))
+
+        if len(unassigned_roles) >= 3:
+            extra_roles = random.sample(unassigned_roles, 3)
+        else:
+            extra_roles = unassigned_roles
+
+    if extra_roles:
+        extra_roles_info = ", ".join(extra_roles)
+    else:
+        extra_roles_info = "Brak dostępnych postaci do podania."
+
+    status_lines = [
+        f"Minionki w grze: {minions_info}.",
+        f"3 postacie dla Impa: {extra_roles_info}.",
+    ]
+
+    if mode == "night":
+        players_info = []
+        for client_id, player in sorted(all_players.items(), key=lambda item: item[1].get("seat") or 9999):
+            executed_label = "wyeliminowany" if player.get("executed", False) else "żywy"
+            players_info.append(f"{player.get('name', 'Nieznany')} ({executed_label})")
+        status_lines.append("Wszyscy gracze: " + ", ".join(players_info) + ".")
+
+    return "\n".join(status_lines)

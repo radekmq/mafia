@@ -7,18 +7,77 @@
 
 {% if is_night %}
 <div class="container" style="overflow-x:auto;">
+  {% if is_imp %}
+  <table id="player_table" cellspacing="0" cellpadding="8">
+    <tr>
+      <td colspan="2" data-key="player_status" style="white-space: pre-line;">{{ player_status }}</td>
+    </tr>
+  </table>
+
+  <div id="impNightControls" style="margin-top: 12px;">
+    <p id="impActionError" style="color: red; font-weight: bold;"></p>
+    <p id="impActionInfo" style="font-weight: bold;"></p>
+    <label for="impTargetSelect">Wybierz gracza do wyeliminowania:</label>
+    <select id="impTargetSelect">
+      {% for player in night_players %}
+      <option value="{{ player.client_id }}">
+        {{ player.name }}{% if player.seat %} (miejsce {{ player.seat }}){% endif %} - {% if player.executed %}wyeliminowany{% else %}żywy{% endif %}
+      </option>
+      {% endfor %}
+    </select>
+    <button id="impConfirmActionBtn" type="button">Wykonaj akcję Impa</button>
+  </div>
+  {% else %}
   <p style="text-align: center; font-weight: bold;">Tryb noc aktywowany, czekaj na rozpoczęcie dnia</p>
+  {% endif %}
 </div>
 
+<script id="impNightStateData" type="application/json">{{ {"isImp": is_imp} | tojson }}</script>
 <script>
+  const impNightState = JSON.parse(document.getElementById("impNightStateData").textContent);
+
   function refreshPlayerPage() {
     window.location.href = `/player_page?t=${Date.now()}`;
+  }
+
+  const isImpNightView = !!impNightState.isImp;
+  if (isImpNightView) {
+    const impTargetSelect = document.getElementById("impTargetSelect");
+    const impConfirmActionBtn = document.getElementById("impConfirmActionBtn");
+    const impActionError = document.getElementById("impActionError");
+    const impActionInfo = document.getElementById("impActionInfo");
+
+    impConfirmActionBtn.addEventListener("click", () => {
+      const targetClientId = impTargetSelect.value;
+      impActionError.textContent = "";
+      impActionInfo.textContent = "Wysyłanie akcji...";
+
+      socket.emit("imp_night_action", {
+        clientId: window.clientId,
+        target_client_id: targetClientId,
+      });
+    });
+
+    socket.on("imp_action_result", data => {
+      impActionError.textContent = "";
+      impActionInfo.textContent = data.message || "Akcja wykonana.";
+      refreshPlayerPage();
+    });
+
+    socket.on("imp_action_error", data => {
+      impActionError.textContent = data.error || "Nie udało się wykonać akcji Impa.";
+      impActionInfo.textContent = "";
+    });
   }
 
   socket.on("update_game_status", data => {
     if (data.mode === "day") {
       refreshPlayerPage();
     }
+  });
+
+  socket.on("force_player_page_refresh", () => {
+    refreshPlayerPage();
   });
 </script>
 {% else %}
@@ -58,12 +117,40 @@
       <button id="voteNoBtn" type="button">NIE</button>
     </div>
   </div>
+
+  {% if is_jasnowidz %}
+  <div id="jasnowidzControls" style="margin-top: 20px;">
+    <p><strong>Dzień {{ day_number }}</strong></p>
+    <p id="jasnowidzError" style="color: red; font-weight: bold;"></p>
+    <p id="jasnowidzInfo" style="font-weight: bold;"></p>
+
+    <label for="jasnowidzFirstTarget">Pierwszy gracz:</label>
+    <select id="jasnowidzFirstTarget">
+      {% for player in night_players %}
+      <option value="{{ player.client_id }}">{{ player.name }}{% if player.seat %} (miejsce {{ player.seat }}){% endif %}</option>
+      {% endfor %}
+    </select>
+
+    <label for="jasnowidzSecondTarget">Drugi gracz:</label>
+    <select id="jasnowidzSecondTarget">
+      {% for player in night_players %}
+      <option value="{{ player.client_id }}">{{ player.name }}{% if player.seat %} (miejsce {{ player.seat }}){% endif %}</option>
+      {% endfor %}
+    </select>
+
+    <button id="jasnowidzAskBtn" type="button" {% if jasnowidz_used_today or is_executed %}disabled{% endif %}>
+      Zadaj pytanie Jasnowidza
+    </button>
+  </div>
+  {% endif %}
 </div>
 
 <script id="playerStateData" type="application/json">{{ {"clientId": client_id, "executed": is_executed, "voteDead": vote_dead} | tojson }}</script>
+<script id="jasnowidzStateData" type="application/json">{{ {"isJasnowidz": is_jasnowidz, "usedToday": jasnowidz_used_today} | tojson }}</script>
 
 <script>
   const playerState = JSON.parse(document.getElementById("playerStateData").textContent);
+  const jasnowidzState = JSON.parse(document.getElementById("jasnowidzStateData").textContent);
 
   const nominateBtn = document.getElementById("nominateBtn");
   const nominationPanel = document.getElementById("nominationPanel");
@@ -76,6 +163,13 @@
   const voteNoBtn = document.getElementById("voteNoBtn");
   const voteError = document.getElementById("voteError");
   const voteInfo = document.getElementById("voteInfo");
+
+  const jasnowidzError = document.getElementById("jasnowidzError");
+  const jasnowidzInfo = document.getElementById("jasnowidzInfo");
+  const jasnowidzAskBtn = document.getElementById("jasnowidzAskBtn");
+  const jasnowidzFirstTarget = document.getElementById("jasnowidzFirstTarget");
+  const jasnowidzSecondTarget = document.getElementById("jasnowidzSecondTarget");
+
   let hasSubmittedVote = false;
 
   function refreshPlayerPage() {
@@ -111,19 +205,68 @@
     socket.emit("cast_execution_vote", { clientId: playerState.clientId, vote });
   }
 
+  function bindTap(element, handler) {
+    if (!element) {
+      return;
+    }
+
+    let touchHandled = false;
+
+    element.addEventListener(
+      "touchend",
+      event => {
+        event.preventDefault();
+        touchHandled = true;
+        handler();
+        setTimeout(() => {
+          touchHandled = false;
+        }, 350);
+      },
+      { passive: false }
+    );
+
+    element.addEventListener("click", event => {
+      if (touchHandled) {
+        event.preventDefault();
+        return;
+      }
+      handler();
+    });
+  }
+
   renderNominationControls();
 
-  nominateBtn.addEventListener("click", () => {
+  if (jasnowidzState.isJasnowidz && jasnowidzAskBtn) {
+    if (jasnowidzState.usedToday) {
+      jasnowidzInfo.textContent = "Dzisiejsze pytanie Jasnowidza zostało już wykorzystane.";
+    }
+
+    jasnowidzAskBtn.addEventListener("click", () => {
+      const firstTarget = jasnowidzFirstTarget.value;
+      const secondTarget = jasnowidzSecondTarget.value;
+
+      jasnowidzError.textContent = "";
+      jasnowidzInfo.textContent = "";
+
+      socket.emit("jasnowidz_day_action", {
+        clientId: playerState.clientId,
+        first_target_client_id: firstTarget,
+        second_target_client_id: secondTarget,
+      });
+    });
+  }
+
+  bindTap(nominateBtn, () => {
     voteError.textContent = "";
     voteInfo.textContent = "";
     socket.emit("request_nomination_candidates", { clientId: playerState.clientId });
   });
 
-  cancelNominationBtn.addEventListener("click", () => {
+  bindTap(cancelNominationBtn, () => {
     nominationPanel.style.display = "none";
   });
 
-  confirmNominationBtn.addEventListener("click", () => {
+  bindTap(confirmNominationBtn, () => {
     voteError.textContent = "";
     const nomineeClientId = nomineeSelect.value;
 
@@ -138,11 +281,11 @@
     });
   });
 
-  voteYesBtn.addEventListener("click", () => {
+  bindTap(voteYesBtn, () => {
     submitExecutionVote("yes", "TAK");
   });
 
-  voteNoBtn.addEventListener("click", () => {
+  bindTap(voteNoBtn, () => {
     submitExecutionVote("no", "NIE");
   });
 
@@ -220,6 +363,28 @@
     hasSubmittedVote = false;
   });
 
+  socket.on("jasnowidz_action_error", data => {
+    if (!jasnowidzState.isJasnowidz || !jasnowidzError) {
+      return;
+    }
+    jasnowidzError.textContent = data.error || "Nie udało się wykonać akcji Jasnowidza.";
+    if (jasnowidzInfo) {
+      jasnowidzInfo.textContent = "";
+    }
+  });
+
+  socket.on("jasnowidz_action_result", data => {
+    if (!jasnowidzState.isJasnowidz || !jasnowidzInfo) {
+      return;
+    }
+    jasnowidzError.textContent = "";
+    jasnowidzInfo.textContent = data.message || "Akcja Jasnowidza wykonana.";
+    if (jasnowidzAskBtn) {
+      jasnowidzAskBtn.disabled = true;
+    }
+    refreshPlayerPage();
+  });
+
   socket.on("update_player_status", data => {
     console.log("🔄 Otrzymano update_player_status:", data);
 
@@ -251,6 +416,10 @@
     if (data.mode === "night") {
       refreshPlayerPage();
     }
+  });
+
+  socket.on("force_player_page_refresh", () => {
+    refreshPlayerPage();
   });
 </script>
 {% endif %}

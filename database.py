@@ -66,7 +66,14 @@ db_characters = {
             "player_status": fun_empata, 
             "player_info": "Każdej nocy Empata dowiaduje się, ilu z jego dwóch żyjących sąsiadów jest złych. Empata uczy się, czy sąsiadujący z nim gracze są dobrzy czy źli."
         },
-        # {"client_id": None, "name": "Jasnowidz", "file": "jasnowidz.png", "route": "jasnowidz", "player_status": fun_jasnowidz, "player_info": "TBD"},
+        {
+            "client_id": None, 
+            "name": "Jasnowidz", 
+            "file": "jasnowidz.png", 
+            "route": "jasnowidz", 
+            "player_status": fun_jasnowidz, 
+            "player_info": "Każdej nocy wybierz 2 graczy: dowiadujesz się, czy którykolwiek z nich jest Demonem. Jasnowidz dowiaduje się, czy którykolwiek z dwóch graczy jest Demonem."    
+        },
         # {"client_id": None, "name": "Grabarz", "file": "grabarz.png", "route": "grabarz", "player_status": fun_grabarz, "player_info": "TBD"},
         # {"client_id": None, "name": "Mnich", "file": "mnich.png", "route": "mnich", "player_status": fun_mnich, "player_info": "TBD"},
         # {"client_id": None, "name": "Strażnik Kruka", "file": "krukopiek.png", "route": "krukopiek", "player_status": fun_krukopiek, "player_info": "TBD"},

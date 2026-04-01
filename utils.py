@@ -869,7 +869,7 @@ def fun_swiety(characters, players, drunk=False, poisoned=False):
 def fun_truciciel(characters, players, drunk=False, poisoned=False, mode="day", day_number=1):
     """
     Funkcja statusu Truciciela.
-    Truciciel wybiera cel w dzień, a zatrucie staje się aktywne dopiero kolejnego dnia.
+    Truciciel wybiera cel w nocy, a zatrucie staje się aktywne kolejnego dnia.
     """
 
     _ = drunk
@@ -899,17 +899,17 @@ def fun_truciciel(characters, players, drunk=False, poisoned=False, mode="day", 
 
     status_lines = []
 
-    if mode == "day":
-        if truciciel_character.get("truciciel_last_day_used") == day_number:
+    if mode == "night":
+        if truciciel_character.get("truciciel_last_night_used") == day_number:
             status_lines.append(
-                f"Dzisiejszy wybór zapisany. Cel na kolejny dzień: {target_name(next_target_id)}."
+                f"Dzisiejszy nocny wybór zapisany. Cel na kolejny dzień: {target_name(next_target_id)}."
             )
         else:
-            status_lines.append("Wybierz w tym dniu cel zatrucia.")
+            status_lines.append("Wybierz tej nocy cel zatrucia na kolejny dzień.")
 
     if active_target_id:
         status_lines.append(
-            f"Aktywne zatrucie (dzień {day_number}): {target_name(active_target_id)}."
+            f"Aktywne zatrucie: {target_name(active_target_id)}."
         )
     else:
         status_lines.append(f"Aktywne zatrucie (dzień {day_number}): brak.")

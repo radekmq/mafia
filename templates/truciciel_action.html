@@ -6,7 +6,7 @@
 <div class="container" style="max-width: 760px;">
   <h2 style="margin-top: 0; text-align: center;">Akcja Truciciela</h2>
 
-  <p style="text-align: center;"><strong>Dzień {{ day_number }}</strong></p>
+  <p style="text-align: center;"><strong>Noc</strong></p>
   <p style="white-space: pre-line; font-weight: bold;">{{ status_text }}</p>
 
   {% if error %}
@@ -14,7 +14,7 @@
   {% endif %}
 
   {% if saved %}
-  <p style="font-weight: bold; text-align: center;">Dzisiejszy wybór został zapisany.</p>
+  <p style="font-weight: bold; text-align: center;">Dzisiejszy nocny wybór został zapisany.</p>
   {% endif %}
 
   {% if not used_today and not is_executed %}

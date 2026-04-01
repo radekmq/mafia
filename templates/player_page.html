@@ -24,8 +24,8 @@
       <td><p id="adminAktualnyTryb" style="text-align: center; margin: 0;">{{ "Dzień" if current_mode == "day" else "Noc" }}</p></td>
     </tr>
     <tr id="adminImpActionStatusRow" {% if current_mode != "night" %}style="display: none;"{% endif %}>
-      <td>Akcja Impa (noc):</td>
-      <td><p id="adminImpActionStatus" style="text-align: center; margin: 0;">{{ "Wykonana" if imp_action_done_night else "Imp jeszcze się zastanawia" }}</p></td>
+      <td>Akcje nocne (Demon + Truciciel):</td>
+      <td><p id="adminImpActionStatus" style="text-align: center; margin: 0;">{{ "Jeszcze się zastanawia" if night_actions_pending else "Wykonana" }}</p></td>
     </tr>
   </table>
 
@@ -69,12 +69,22 @@
   {% else %}
   <p style="text-align: center; font-weight: bold;">Tryb noc aktywowany, czekaj na rozpoczęcie dnia</p>
   {% endif %}
+
+  {% if is_truciciel %}
+  <div id="trucicielControlsNight" style="margin-top: 12px;">
+    <button id="trucicielOpenBtnNight" type="button" {% if truciciel_action_done_night or is_executed %}disabled{% endif %}>Zatruj postać</button>
+    {% if truciciel_action_done_night %}
+    <p style="font-weight: bold; text-align: center;">Akcja Truciciela została już wykonana tej nocy.</p>
+    {% endif %}
+  </div>
+  {% endif %}
 </div>
 
-<script id="impNightViewData" type="application/json">{{ {"isImp": is_imp} | tojson }}</script>
+<script id="impNightViewData" type="application/json">{{ {"isImp": is_imp, "isTruciciel": is_truciciel} | tojson }}</script>
 <script>
   const impNightViewData = JSON.parse(document.getElementById("impNightViewData").textContent);
   const isImpNightView = !!impNightViewData.isImp;
+  const isTrucicielNightView = !!impNightViewData.isTruciciel;
   const socketRef = window.socket || null;
 
   function refreshPlayerPage() {
@@ -159,6 +169,13 @@
     }
   }
 
+  if (isTrucicielNightView) {
+    const trucicielOpenBtnNight = document.getElementById("trucicielOpenBtnNight");
+    bindTap(trucicielOpenBtnNight, () => {
+      window.location.href = "/truciciel-akcja";
+    });
+  }
+
   if (socketRef) {
     socketRef.on("update_game_status", data => {
       if (data.mode === "day") {
@@ -204,17 +221,6 @@
     {% endif %}
   </div>
 
-  {% if is_truciciel %}
-  <div id="trucicielControls" style="margin-top: 20px;">
-    {% if truciciel_used_today %}
-    <p style="font-weight: bold; text-align: center;">Dzisiejsze zatrucie Truciciela zostało już wykorzystane.</p>
-    {% endif %}
-
-    <button id="trucicielOpenBtn" type="button" {% if truciciel_used_today or is_executed %}disabled{% endif %}>
-      Zatruj postać
-    </button>
-  </div>
-  {% endif %}
 </div>
 
 <script id="playerStateData" type="application/json">{{ {"clientId": client_id, "executed": is_executed, "voteDead": vote_dead} | tojson }}</script>
@@ -229,7 +235,6 @@
   const wikiBtn = document.getElementById("wikiBtn");
   const adminPanelBtn = document.getElementById("adminPanelBtn");
 
-  const trucicielOpenBtn = document.getElementById("trucicielOpenBtn");
 
   function refreshPlayerPage() {
     window.location.href = `/player_page?t=${Date.now()}`;
@@ -316,12 +321,6 @@
   if (jasnowidzState.isJasnowidz && jasnowidzOpenBtn) {
     bindTap(jasnowidzOpenBtn, () => {
       window.location.href = "/jasnowidz-akcja";
-    });
-  }
-
-  if (trucicielOpenBtn) {
-    bindTap(trucicielOpenBtn, () => {
-      window.location.href = "/truciciel-akcja";
     });
   }
 
@@ -419,10 +418,10 @@
         adminImpActionStatusRow.style.display = data.mode === "night" ? "table-row" : "none";
       }
 
-      if (adminImpActionStatus && typeof data.imp_action_done_night !== "undefined") {
-        adminImpActionStatus.textContent = data.imp_action_done_night
-          ? "Wykonana"
-          : "Imp jeszcze się zastanawia";
+      if (adminImpActionStatus && typeof data.night_actions_pending !== "undefined") {
+        adminImpActionStatus.textContent = data.night_actions_pending
+          ? "Jeszcze się zastanawia"
+          : "Wykonana";
       }
 
       if (data.execution_vote_active) {
@@ -541,10 +540,10 @@
         }
       }
 
-      if (typeof data.imp_action_done_night !== "undefined" && adminImpActionStatus) {
-        adminImpActionStatus.textContent = data.imp_action_done_night
-          ? "Wykonana"
-          : "Imp jeszcze się zastanawia";
+      if (typeof data.night_actions_pending !== "undefined" && adminImpActionStatus) {
+        adminImpActionStatus.textContent = data.night_actions_pending
+          ? "Jeszcze się zastanawia"
+          : "Wykonana";
       }
     });
   })();

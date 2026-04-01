@@ -24,8 +24,8 @@
           <td><p id="aktualny_tryb" style="text-align: center;">{{ "Dzień" if current_mode == "day" else "Noc" }}</p></td>
         </tr>
         <tr id="impActionStatusRow" {% if current_mode != "night" %}style="display: none;"{% endif %}>
-          <td>Akcja Impa (noc):</td>
-          <td><p id="imp_action_status" style="text-align: center;">{{ "Wykonana" if imp_action_done_night else "Imp jeszcze się zastanawia" }}</p></td>
+          <td>Akcje nocne (Demon + Truciciel):</td>
+          <td><p id="imp_action_status" style="text-align: center;">{{ "Jeszcze się zastanawia" if night_actions_pending else "Wykonana" }}</p></td>
         </tr>
         <tr id="showCharactersRow">
           <td colspan="2" style="text-align: center;">Losuj postacie</td>
@@ -125,10 +125,10 @@
         }
       }
 
-      if (typeof data.imp_action_done_night !== "undefined") {
+      if (typeof data.night_actions_pending !== "undefined") {
         const impActionStatus = document.getElementById("imp_action_status");
         if (impActionStatus) {
-          impActionStatus.textContent = data.imp_action_done_night ? "Wykonana" : "Imp jeszcze się zastanawia";
+          impActionStatus.textContent = data.night_actions_pending ? "Jeszcze się zastanawia" : "Wykonana";
         }
       }
 

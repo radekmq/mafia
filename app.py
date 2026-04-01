@@ -27,6 +27,7 @@ db_game = {
     "winner": None,
     "nominator_last_day": {},
     "imp_action_done_night": False,
+    "truciciel_action_done_night": False,
 }
 db_game_selection = None
 
@@ -285,6 +286,27 @@ def is_seat_taken(seat, excluded_client_id=None):
 
 
 def build_game_status_payload():
+    imp_required = False
+    imp_client_id = get_current_imp_client_id()
+    if imp_client_id and imp_client_id in db_players:
+        ensure_player_flags(db_players[imp_client_id])
+        imp_required = not db_players[imp_client_id]["executed"]
+
+    truciciel_required = False
+    truciciel_character = get_truciciel_character()
+    if truciciel_character:
+        truciciel_client_id = truciciel_character.get("client_id")
+        if truciciel_client_id in db_players:
+            ensure_player_flags(db_players[truciciel_client_id])
+            truciciel_required = not db_players[truciciel_client_id]["executed"]
+
+    imp_done = db_game.get("imp_action_done_night", False)
+    truciciel_done = db_game.get("truciciel_action_done_night", False)
+    night_actions_pending = db_game.get("mode") == "night" and (
+        (imp_required and not imp_done)
+        or (truciciel_required and not truciciel_done)
+    )
+
     return {
         "no_of_players": len(db_players),
         "game_status": db_game["game_active"],
@@ -292,7 +314,9 @@ def build_game_status_payload():
         "char_presented": db_game["char_presented"],
         "mode": db_game["mode"],
         "day_number": db_game.get("day_number", 1),
-        "imp_action_done_night": db_game.get("imp_action_done_night", False),
+        "imp_action_done_night": imp_done,
+        "truciciel_action_done_night": truciciel_done,
+        "night_actions_pending": night_actions_pending,
         "winner": db_game.get("winner"),
         "execution_vote_active": execution_vote_state["active"],
     }
@@ -445,6 +469,7 @@ def reset_all_game_state():
     db_game["winner"] = None
     db_game["nominator_last_day"] = {}
     db_game["imp_action_done_night"] = False
+    db_game["truciciel_action_done_night"] = False
 
     clients.clear()
     db_players._data.clear()
@@ -584,12 +609,12 @@ def submit_execution_vote(voter_client_id, raw_vote):
     return None
 
 
-def perform_truciciel_day_action(actor_client_id, target_client_id):
+def perform_truciciel_night_action(actor_client_id, target_client_id):
     if not db_game_selection:
         return "Brak aktywnej rozgrywki.", None
 
-    if db_game.get("mode") != "day":
-        return "Akcja Truciciela jest dostępna tylko w dzień.", None
+    if db_game.get("mode") != "night":
+        return "Akcja Truciciela jest dostępna tylko w nocy.", None
 
     if not actor_client_id or actor_client_id not in db_players:
         return "Nie znaleziono gracza wykonującego akcję.", None
@@ -605,18 +630,23 @@ def perform_truciciel_day_action(actor_client_id, target_client_id):
     if not real_character or real_character.get("name") != "Truciciel":
         return "Tylko Truciciel może wykonać tę akcję.", None
 
+    if db_game.get("truciciel_action_done_night"):
+        return "Akcja Truciciela została już wykonana tej nocy.", None
+
     day_number = db_game.get("day_number", 1)
-    if real_character.get("truciciel_last_day_used") == day_number:
-        return "Dzisiaj wykorzystałeś już zatrucie.", None
 
     poison_targets_by_day = real_character.setdefault("truciciel_poison_targets_by_day", {})
     next_day = day_number + 1
     poison_targets_by_day[str(next_day)] = target_client_id
 
-    real_character["truciciel_last_day_used"] = day_number
+    real_character["truciciel_last_night_used"] = day_number
     real_character["truciciel_last_selected_target_client_id"] = target_client_id
     real_character.pop("resolved_player_status", None)
     real_character.pop("resolved_player_status_key", None)
+
+    db_game["truciciel_action_done_night"] = True
+    socketio.emit("update_game_status", build_game_status_payload())
+    socketio.emit("force_player_page_refresh", {})
 
     target_name = db_players[target_client_id].get("name", "Nieznany")
     result_message = (
@@ -1097,7 +1127,7 @@ def handle_truciciel_day_action(data):
     actor_client_id = data.get("clientId") or data.get("client_id")
     target_client_id = data.get("target_client_id")
 
-    error, result_message = perform_truciciel_day_action(actor_client_id, target_client_id)
+    error, result_message = perform_truciciel_night_action(actor_client_id, target_client_id)
     if error:
         emit("truciciel_action_error", {"error": error})
         return
@@ -1245,16 +1275,19 @@ def lobby():
 def game_status():
     client_id = session.get("client_id")
     is_player = bool(client_id and client_id in db_players)
+    status_payload = build_game_status_payload()
 
     response = jsonify({
         "no_of_players": len(db_players),
-        "game_active": db_game["game_active"],
-        "char_presented": db_game["char_presented"],
-        "mode": db_game["mode"],
-        "day_number": db_game.get("day_number", 1),
-        "imp_action_done_night": db_game.get("imp_action_done_night", False),
-        "winner": db_game.get("winner"),
-        "execution_vote_active": execution_vote_state["active"],
+        "game_active": status_payload["game_active"],
+        "char_presented": status_payload["char_presented"],
+        "mode": status_payload["mode"],
+        "day_number": status_payload.get("day_number", 1),
+        "imp_action_done_night": status_payload.get("imp_action_done_night", False),
+        "truciciel_action_done_night": status_payload.get("truciciel_action_done_night", False),
+        "night_actions_pending": status_payload.get("night_actions_pending", False),
+        "winner": status_payload.get("winner"),
+        "execution_vote_active": status_payload["execution_vote_active"],
         "is_player": is_player,
         "server_ts": int(time.time() * 1000),
     })
@@ -1349,6 +1382,7 @@ def handle_menu():
         char_presented=db_game["char_presented"],
         current_mode=db_game["mode"],
         imp_action_done_night=db_game.get("imp_action_done_night", False),
+        night_actions_pending=build_game_status_payload().get("night_actions_pending", False),
     )
 
 
@@ -1366,9 +1400,11 @@ def set_game_mode():
     if previous_mode == "night" and mode == "day":
         db_game["day_number"] = db_game.get("day_number", 1) + 1
         db_game["imp_action_done_night"] = False
+        db_game["truciciel_action_done_night"] = False
 
     if previous_mode != "night" and mode == "night":
         db_game["imp_action_done_night"] = False
+        db_game["truciciel_action_done_night"] = False
 
     if previous_mode != mode and db_game_selection:
         invalidate_dynamic_statuses()
@@ -1390,6 +1426,7 @@ def create():
             db_game["day_number"] = 1
             db_game["nominator_last_day"] = {}
             db_game["imp_action_done_night"] = False
+            db_game["truciciel_action_done_night"] = False
             
             socketio.emit("update_game_status", { 
                                                 "no_of_players": db_game["no_of_players"], 
@@ -1398,6 +1435,7 @@ def create():
                                                 "char_presented": db_game["char_presented"],
                                                 "mode": db_game["mode"],
                                                 "imp_action_done_night": db_game["imp_action_done_night"],
+                                                "truciciel_action_done_night": db_game["truciciel_action_done_night"],
                                                 })
         elif event == "show":
             print(f"[create] Otrzymano żądanie losowania postaci od client_id={client_id}")
@@ -1410,6 +1448,7 @@ def create():
             db_game["day_number"] = 1
             db_game["nominator_last_day"] = {}
             db_game["imp_action_done_night"] = False
+            db_game["truciciel_action_done_night"] = False
             socketio.emit("update_game_status", { 
                                                 "no_of_players": db_game["no_of_players"], 
                                                 "game_status": "Postacie zostały rozlosowane.",
@@ -1417,6 +1456,7 @@ def create():
                                                 "char_presented": db_game["char_presented"],
                                                 "mode": db_game["mode"],
                                                 "imp_action_done_night": db_game["imp_action_done_night"],
+                                                "truciciel_action_done_night": db_game["truciciel_action_done_night"],
                                                 })
             
             print("\n\n")
@@ -1678,9 +1718,7 @@ def player_page():
     if is_jasnowidz:
         jasnowidz_used_today = real_character.get("jasnowidz_last_day_used") == db_game.get("day_number", 1)
 
-    truciciel_used_today = False
-    if is_truciciel:
-        truciciel_used_today = real_character.get("truciciel_last_day_used") == db_game.get("day_number", 1)
+    truciciel_action_done_night = db_game.get("truciciel_action_done_night", False)
 
     if real_character and real_character.get("name") == "Pijak":
         print(
@@ -1705,9 +1743,10 @@ def player_page():
         is_jasnowidz=is_jasnowidz,
         jasnowidz_used_today=jasnowidz_used_today,
         is_truciciel=is_truciciel,
-        truciciel_used_today=truciciel_used_today,
+        truciciel_action_done_night=truciciel_action_done_night,
         minion_night_status=minion_night_status,
         imp_action_done_night=db_game.get("imp_action_done_night", False),
+        night_actions_pending=build_game_status_payload().get("night_actions_pending", False),
         night_players=night_players,
         is_admin=(client_id == db_game.get("admin_id")),
         liczba_graczy=len(db_players),
@@ -1882,20 +1921,20 @@ def truciciel_action_page():
     if not real_character or real_character.get("name") != "Truciciel":
         return redirect(url_for("player_page"))
 
-    if db_game.get("mode") != "day":
+    if db_game.get("mode") != "night":
         return redirect(url_for("player_page"))
 
     error = ""
 
     if request.method == "POST":
         target_client_id = (request.form.get("target_client_id") or "").strip()
-        error, _ = perform_truciciel_day_action(client_id, target_client_id)
+        error, _ = perform_truciciel_night_action(client_id, target_client_id)
         if not error:
             socketio.emit("force_player_page_refresh", {})
             return redirect(url_for("truciciel_action_page", saved="1"))
 
     day_number = db_game.get("day_number", 1)
-    used_today = real_character.get("truciciel_last_day_used") == day_number
+    used_today = db_game.get("truciciel_action_done_night", False)
 
     return render_template(
         "truciciel_action.html",

@@ -231,6 +231,10 @@
   const trucicielTarget = document.getElementById("trucicielTarget");
 
   let hasSubmittedVote = false;
+  let awaitingNominationCandidates = false;
+  let nominationRequestTimeoutId = null;
+  const isTouchDevice = (window.matchMedia && window.matchMedia("(pointer: coarse)").matches)
+    || (typeof navigator !== "undefined" && navigator.maxTouchPoints > 0);
 
   function refreshPlayerPage() {
     window.location.href = `/player_page?t=${Date.now()}`;
@@ -265,22 +269,155 @@
     socket.emit("cast_execution_vote", { clientId: playerState.clientId, vote });
   }
 
+  function renderNominationCandidates(data) {
+    voteError.textContent = "";
+
+    if (data.error) {
+      voteError.textContent = data.error;
+      nominationPanel.style.display = "none";
+      voteInfo.textContent = "";
+      return;
+    }
+
+    nomineeSelect.innerHTML = "";
+    const candidates = Array.isArray(data.players) ? data.players : [];
+
+    candidates.forEach(player => {
+      const option = document.createElement("option");
+      const seatLabel = player.seat ? ` (miejsce ${player.seat})` : "";
+      option.value = player.client_id;
+      option.textContent = `${player.name}${seatLabel}`;
+      nomineeSelect.appendChild(option);
+    });
+
+    nominationPanel.style.display = candidates.length ? "block" : "none";
+    voteInfo.textContent = "";
+    if (!candidates.length) {
+      voteError.textContent = "Brak dostępnych graczy do nominacji.";
+    }
+  }
+
+  async function fetchNominationCandidatesFallback() {
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 4000);
+
+    try {
+      const response = await fetch(`/nomination-candidates?client_id=${encodeURIComponent(playerState.clientId)}`, {
+        method: "GET",
+        cache: "no-store",
+        credentials: "same-origin",
+        signal: controller.signal,
+      });
+      const data = await response.json();
+      renderNominationCandidates(data || {});
+    } catch (err) {
+      voteError.textContent = "Nie udało się pobrać listy kandydatów. Spróbuj ponownie.";
+      voteInfo.textContent = "";
+      nominationPanel.style.display = "none";
+    } finally {
+      clearTimeout(timeoutId);
+    }
+  }
+
+  function applyExecutionVoteStart(data) {
+    nominationPanel.style.display = "none";
+    voteError.textContent = "";
+
+    voteQuestion.textContent = `Czy chcesz wyeliminować gracza: ${data.nominee_name} z gry?`;
+    hasSubmittedVote = false;
+
+    const allowedToVote = data.can_vote === true && canVote();
+    votePanel.style.display = allowedToVote ? "block" : "none";
+
+    if (allowedToVote) {
+      voteInfo.textContent = "Oddaj głos: TAK lub NIE.";
+      setVotingButtonsDisabled(false);
+    } else {
+      voteInfo.textContent = "Trwa głosowanie. Nie musisz oddawać głosu.";
+    }
+  }
+
+  async function startExecutionVoteFallback(nomineeClientId) {
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 4000);
+
+    try {
+      const response = await fetch("/start-execution-vote", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "same-origin",
+        signal: controller.signal,
+        body: JSON.stringify({
+          client_id: playerState.clientId,
+          nominee_client_id: nomineeClientId,
+        }),
+      });
+
+      const data = await response.json();
+      if (!response.ok || data.error) {
+        voteError.textContent = (data && data.error) || "Nie udało się rozpocząć głosowania.";
+        return;
+      }
+
+      applyExecutionVoteStart(data);
+    } catch (err) {
+      voteError.textContent = "Błąd połączenia. Nie udało się rozpocząć głosowania.";
+    } finally {
+      clearTimeout(timeoutId);
+    }
+  }
+
   function bindTap(element, handler) {
     if (!element) {
       return;
     }
 
     let touchHandled = false;
+    let lastHandledAt = 0;
 
+    const runHandler = event => {
+      const now = Date.now();
+      if (now - lastHandledAt < 450) {
+        return;
+      }
+      lastHandledAt = now;
+
+      if (event && event.cancelable) {
+        event.preventDefault();
+      }
+
+      touchHandled = true;
+      handler();
+      setTimeout(() => {
+        touchHandled = false;
+      }, 350);
+    };
+
+    // Pointer events work reliably on modern mobile browsers.
+    element.addEventListener("pointerup", event => {
+      if (event.pointerType === "mouse" && event.button !== 0) {
+        return;
+      }
+      runHandler(event);
+    });
+
+    // iOS Safari fallback: touchstart is often the most reliable trigger.
+    element.addEventListener(
+      "touchstart",
+      event => {
+        runHandler(event);
+      },
+      { passive: false }
+    );
+
+    // Fallback for older mobile browsers without pointer events.
     element.addEventListener(
       "touchend",
       event => {
-        event.preventDefault();
-        touchHandled = true;
-        handler();
-        setTimeout(() => {
-          touchHandled = false;
-        }, 350);
+        if (touchHandled) {
+          return;
+        }
+        runHandler(event);
       },
       { passive: false }
     );
@@ -301,7 +438,7 @@
       jasnowidzInfo.textContent = "Dzisiejsze pytanie Jasnowidza zostało już wykorzystane.";
     }
 
-    jasnowidzAskBtn.addEventListener("click", () => {
+    bindTap(jasnowidzAskBtn, () => {
       const firstTarget = jasnowidzFirstTarget.value;
       const secondTarget = jasnowidzSecondTarget.value;
 
@@ -345,9 +482,7 @@
   }
 
   bindTap(nominateBtn, () => {
-    voteError.textContent = "";
-    voteInfo.textContent = "";
-    socket.emit("request_nomination_candidates", { clientId: playerState.clientId });
+    window.location.href = "/nomination";
   });
 
   bindTap(cancelNominationBtn, () => {
@@ -360,6 +495,12 @@
 
     if (!nomineeClientId) {
       voteError.textContent = "Wybierz gracza do nominacji.";
+      return;
+    }
+
+    if (isTouchDevice) {
+      voteInfo.textContent = "Rozpoczynanie głosowania...";
+      startExecutionVoteFallback(nomineeClientId);
       return;
     }
 
@@ -378,47 +519,17 @@
   });
 
   socket.on("nomination_candidates", data => {
-    voteError.textContent = "";
-
-    if (data.error) {
-      voteError.textContent = data.error;
-      nominationPanel.style.display = "none";
-      return;
+    awaitingNominationCandidates = false;
+    if (nominationRequestTimeoutId) {
+      clearTimeout(nominationRequestTimeoutId);
+      nominationRequestTimeoutId = null;
     }
 
-    nomineeSelect.innerHTML = "";
-    const candidates = Array.isArray(data.players) ? data.players : [];
-
-    candidates.forEach(player => {
-      const option = document.createElement("option");
-      const seatLabel = player.seat ? ` (miejsce ${player.seat})` : "";
-      option.value = player.client_id;
-      option.textContent = `${player.name}${seatLabel}`;
-      nomineeSelect.appendChild(option);
-    });
-
-    nominationPanel.style.display = candidates.length ? "block" : "none";
-    if (!candidates.length) {
-      voteError.textContent = "Brak dostępnych graczy do nominacji.";
-    }
+    renderNominationCandidates(data || {});
   });
 
   socket.on("execution_vote_started", data => {
-    nominationPanel.style.display = "none";
-    voteError.textContent = "";
-
-    voteQuestion.textContent = `Czy chcesz wyeliminować gracza: ${data.nominee_name} z gry?`;
-    hasSubmittedVote = false;
-
-    const allowedToVote = data.can_vote === true && canVote();
-    votePanel.style.display = allowedToVote ? "block" : "none";
-
-    if (allowedToVote) {
-      voteInfo.textContent = "Oddaj głos: TAK lub NIE.";
-      setVotingButtonsDisabled(false);
-    } else {
-      voteInfo.textContent = "Trwa głosowanie. Nie musisz oddawać głosu.";
-    }
+    applyExecutionVoteStart(data);
   });
 
   socket.on("execution_vote_error", data => {

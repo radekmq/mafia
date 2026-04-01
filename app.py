@@ -89,6 +89,31 @@ def get_optional_dead_voter_ids():
     return optional_voters
 
 
+def build_nomination_candidates_payload(client_id):
+    if not client_id or client_id not in db_players:
+        return {"error": "Nie znaleziono gracza."}
+
+    ensure_player_flags(db_players[client_id])
+    if db_players[client_id]["executed"]:
+        return {"error": "Gracz wyeliminowany nie może nominować."}
+
+    if execution_vote_state["active"]:
+        return {"error": "Trwa już inne głosowanie."}
+
+    candidates = []
+    for candidate_id in get_alive_player_ids():
+        player = db_players[candidate_id]
+        candidates.append(
+            {
+                "client_id": candidate_id,
+                "name": player.get("name", "Nieznany"),
+                "seat": player.get("seat"),
+            }
+        )
+
+    return {"players": candidates}
+
+
 def is_seat_taken(seat, excluded_client_id=None):
     for existing_client_id, player in db_players.get_all().items():
         if existing_client_id == excluded_client_id:
@@ -257,6 +282,36 @@ def finalize_execution_vote_if_ready(force=False):
 
     emit_execution_vote_result(message, yes_votes, no_votes, player_executed)
     reset_execution_vote_state()
+
+
+def try_start_execution_vote(nominator_client_id, nominee_client_id):
+    if execution_vote_state["active"]:
+        return "Trwa już inne głosowanie."
+
+    if not nominator_client_id or nominator_client_id not in db_players:
+        return "Nie znaleziono nominującego gracza."
+
+    ensure_player_flags(db_players[nominator_client_id])
+    if db_players[nominator_client_id]["executed"]:
+        return "Gracz wyeliminowany nie może nominować."
+
+    if not nominee_client_id or nominee_client_id not in db_players:
+        return "Nie znaleziono nominowanego gracza."
+
+    ensure_player_flags(db_players[nominee_client_id])
+    if db_players[nominee_client_id]["executed"]:
+        return "Nie można nominować gracza już wyeliminowanego."
+
+    execution_vote_state["active"] = True
+    execution_vote_state["nominator_client_id"] = nominator_client_id
+    execution_vote_state["nominee_client_id"] = nominee_client_id
+    execution_vote_state["nominee_name"] = db_players[nominee_client_id].get("name", "Nieznany")
+    execution_vote_state["votes"] = {}
+    execution_vote_state["required_voters"] = get_alive_player_ids()
+    execution_vote_state["optional_voters"] = get_optional_dead_voter_ids()
+
+    emit_execution_vote_started()
+    return None
     if player_executed:
         check_and_announce_evil_win_if_needed()
 
@@ -397,70 +452,23 @@ def handle_disconnect():
 @socketio.on("request_nomination_candidates")
 def handle_request_nomination_candidates(data):
     client_id = data.get("clientId") or data.get("client_id")
-
-    if not client_id or client_id not in db_players:
-        emit("nomination_candidates", {"error": "Nie znaleziono gracza."})
-        return
-
-    ensure_player_flags(db_players[client_id])
-    if db_players[client_id]["executed"]:
-        emit("nomination_candidates", {"error": "Gracz wyeliminowany nie może nominować."})
-        return
-
-    if execution_vote_state["active"]:
-        emit("nomination_candidates", {"error": "Trwa już inne głosowanie."})
-        return
-
-    candidates = []
-    for candidate_id in get_alive_player_ids():
-        player = db_players[candidate_id]
-        candidates.append(
-            {
-                "client_id": candidate_id,
-                "name": player.get("name", "Nieznany"),
-                "seat": player.get("seat"),
-            }
-        )
-
-    emit("nomination_candidates", {"players": candidates})
+    print(f"[nomination/socket] request_nomination_candidates client_id={client_id}")
+    payload = build_nomination_candidates_payload(client_id)
+    emit("nomination_candidates", payload)
 
 
 @socketio.on("start_execution_vote")
 def handle_start_execution_vote(data):
     nominator_client_id = data.get("clientId") or data.get("client_id")
     nominee_client_id = data.get("nominee_client_id")
+    print(
+        "[nomination/socket] start_execution_vote "
+        f"nominator_client_id={nominator_client_id}, nominee_client_id={nominee_client_id}"
+    )
 
-    if execution_vote_state["active"]:
-        emit("execution_vote_error", {"error": "Trwa już inne głosowanie."})
-        return
-
-    if not nominator_client_id or nominator_client_id not in db_players:
-        emit("execution_vote_error", {"error": "Nie znaleziono nominującego gracza."})
-        return
-
-    ensure_player_flags(db_players[nominator_client_id])
-    if db_players[nominator_client_id]["executed"]:
-        emit("execution_vote_error", {"error": "Gracz wyeliminowany nie może nominować."})
-        return
-
-    if not nominee_client_id or nominee_client_id not in db_players:
-        emit("execution_vote_error", {"error": "Nie znaleziono nominowanego gracza."})
-        return
-
-    ensure_player_flags(db_players[nominee_client_id])
-    if db_players[nominee_client_id]["executed"]:
-        emit("execution_vote_error", {"error": "Nie można nominować gracza już wyeliminowanego."})
-        return
-
-    execution_vote_state["active"] = True
-    execution_vote_state["nominator_client_id"] = nominator_client_id
-    execution_vote_state["nominee_client_id"] = nominee_client_id
-    execution_vote_state["nominee_name"] = db_players[nominee_client_id].get("name", "Nieznany")
-    execution_vote_state["votes"] = {}
-    execution_vote_state["required_voters"] = get_alive_player_ids()
-    execution_vote_state["optional_voters"] = get_optional_dead_voter_ids()
-
-    emit_execution_vote_started()
+    error = try_start_execution_vote(nominator_client_id, nominee_client_id)
+    if error:
+        emit("execution_vote_error", {"error": error})
 
 
 @socketio.on("cast_execution_vote")
@@ -848,6 +856,55 @@ def game_status():
         "is_player": is_player,
     }), 200
 
+
+@app.route("/nomination-candidates", methods=["GET"])
+def nomination_candidates():
+    session_client_id = session.get("client_id")
+    client_id = session_client_id or request.args.get("client_id")
+    print(
+        "[nomination/http] nomination-candidates "
+        f"session_client_id={session_client_id}, requested_client_id={client_id}"
+    )
+
+    if not client_id:
+        return jsonify({"error": "Brak aktywnej sesji gracza."}), 401
+
+    payload = build_nomination_candidates_payload(client_id)
+    status_code = 200 if "error" not in payload else 400
+    return jsonify(payload), status_code
+
+
+@app.route("/start-execution-vote", methods=["POST"])
+def start_execution_vote_http():
+    payload = request.get_json(silent=True) or {}
+    session_client_id = session.get("client_id")
+    nominator_client_id = session_client_id or payload.get("client_id") or payload.get("clientId")
+    nominee_client_id = payload.get("nominee_client_id")
+    print(
+        "[nomination/http] start-execution-vote "
+        f"session_client_id={session_client_id}, nominator_client_id={nominator_client_id}, "
+        f"nominee_client_id={nominee_client_id}"
+    )
+
+    if not nominator_client_id:
+        return jsonify({"error": "Brak aktywnej sesji gracza."}), 401
+
+    error = try_start_execution_vote(nominator_client_id, nominee_client_id)
+    if error:
+        return jsonify({"error": error}), 400
+
+    ensure_player_flags(db_players[nominator_client_id])
+    can_vote = (not db_players[nominator_client_id]["executed"]) or db_players[nominator_client_id]["vote_dead"]
+
+    return jsonify(
+        {
+            "status": "ok",
+            "nominee_client_id": execution_vote_state["nominee_client_id"],
+            "nominee_name": execution_vote_state["nominee_name"],
+            "can_vote": can_vote,
+        }
+    ), 200
+
 @app.route("/menu")
 def handle_menu():
     client_id = session.get("client_id")
@@ -1200,6 +1257,41 @@ def player_page():
         is_admin=(client_id == db_game.get("admin_id")),
         liczba_graczy=len(db_players),
         char_presented=db_game.get("char_presented", False),
+    )
+
+
+@app.route("/nomination", methods=["GET", "POST"])
+def nomination_page():
+    client_id = session.get("client_id")
+    if not client_id or client_id not in db_players:
+        return redirect(url_for("index"))
+
+    if not db_game_selection:
+        return redirect(url_for("player_page"))
+
+    ensure_player_flags(db_players[client_id])
+    if db_game.get("mode") != "day":
+        return redirect(url_for("player_page"))
+
+    error = ""
+
+    if request.method == "POST":
+        nominee_client_id = (request.form.get("nominee_client_id") or "").strip()
+        error = try_start_execution_vote(client_id, nominee_client_id) or ""
+        if not error:
+            return redirect(url_for("player_page"))
+
+    payload = build_nomination_candidates_payload(client_id)
+    if payload.get("error"):
+        error = payload["error"]
+        candidates = []
+    else:
+        candidates = payload.get("players", [])
+
+    return render_template(
+        "nomination.html",
+        candidates=candidates,
+        error=error,
     )
     
 def update_player(client_id):  

@@ -17,22 +17,25 @@
         </tr>
         <tr>
           <td>Postacie wylosowane:</td>
-          <td ><p id="postacie_wylosowane" style="text-align: center;">{{postacie_wylosowane}}</p></td>
+          <td ><p id="postacie_wylosowane" style="text-align: center;">{{ "TAK" if char_presented else "NIE" }}</p></td>
         </tr>
         <tr>
           <td>Aktualny tryb:</td>
           <td><p id="aktualny_tryb" style="text-align: center;">{{ "Dzień" if current_mode == "day" else "Noc" }}</p></td>
         </tr>
-        <tr>
-          <td colspan="2" onclick="showCharacters()" style="text-align: center;">Losuj postacie</td>
+        <tr id="showCharactersRow">
+          <td colspan="2" style="text-align: center;">Losuj postacie</td>
         </tr>
-        <tr>
-          <td colspan="2" onclick="setGameMode('day')" style="text-align: center;">Włącz tryb dzień</td>
+        <tr id="dayModeRow">
+          <td colspan="2" style="text-align: center;">Włącz tryb dzień</td>
         </tr>
-        <tr>
-          <td colspan="2" onclick="setGameMode('night')" style="text-align: center;">Włącz tryb noc</td>
+        <tr id="nightModeRow">
+          <td colspan="2" style="text-align: center;">Włącz tryb noc</td>
         </tr>
       </table>
+      {% if char_presented %}
+      <button type="button" id="openPlayerPanelBtn" data-href="{{ url_for('player_page') }}">Panel gracza</button>
+      {% endif %}
       <button type="button" data-href="{{ url_for('handle_wiki', back='handle_menu') }}" onclick="window.location.href=this.dataset.href">Wiki z listą postaci</button>
     </div>
 
@@ -40,13 +43,114 @@
   </div>
 
   <script>
-    socket.on("update_game_status", data => {
-      document.getElementById("liczba_graczy").textContent = data.no_of_players;
-      document.getElementById("postacie_wylosowane").textContent = data.char_presented
+    function bindTap(element, handler) {
+      if (!element) {
+        return;
+      }
+
+      let touchHandled = false;
+      let lastHandledAt = 0;
+
+      const runHandler = event => {
+        const now = Date.now();
+        if (now - lastHandledAt < 450) {
+          return;
+        }
+        lastHandledAt = now;
+
+        if (event && event.cancelable) {
+          event.preventDefault();
+        }
+
+        touchHandled = true;
+        handler();
+        setTimeout(() => {
+          touchHandled = false;
+        }, 350);
+      };
+
+      element.addEventListener("pointerup", event => {
+        if (event.pointerType === "mouse" && event.button !== 0) {
+          return;
+        }
+        runHandler(event);
+      });
+
+      element.addEventListener(
+        "touchstart",
+        event => {
+          runHandler(event);
+        },
+        { passive: false }
+      );
+
+      element.addEventListener(
+        "touchend",
+        event => {
+          if (touchHandled) {
+            return;
+          }
+          runHandler(event);
+        },
+        { passive: false }
+      );
+
+      element.addEventListener("click", event => {
+        if (touchHandled) {
+          event.preventDefault();
+          return;
+        }
+        handler();
+      });
+    }
+
+    function applyGameStatus(data) {
+      if (typeof data.no_of_players !== "undefined") {
+        document.getElementById("liczba_graczy").textContent = data.no_of_players;
+      }
+
+      if (typeof data.char_presented !== "undefined") {
+        document.getElementById("postacie_wylosowane").textContent = data.char_presented ? "TAK" : "NIE";
+      }
+
       if (data.mode === "day" || data.mode === "night") {
         document.getElementById("aktualny_tryb").textContent = data.mode === "day" ? "Dzień" : "Noc";
       }
-    });
+
+      if (typeof data.char_presented !== "undefined") {
+        const openPlayerPanelBtn = document.getElementById("openPlayerPanelBtn");
+        if (openPlayerPanelBtn) {
+          openPlayerPanelBtn.style.display = data.char_presented ? "block" : "none";
+        }
+      }
+    }
+
+    if (window.socket) {
+      window.socket.on("update_game_status", data => {
+        applyGameStatus(data);
+      });
+    }
+
+    async function pollGameStatus() {
+      try {
+        const response = await fetch("/game-status", {
+          method: "GET",
+          cache: "no-store"
+        });
+
+        if (!response.ok) {
+          return;
+        }
+
+        const data = await response.json();
+        applyGameStatus(data);
+      } catch (err) {
+        console.warn("Polling game-status nie powiodl sie:", err);
+      }
+    }
+
+    pollGameStatus();
+    setInterval(pollGameStatus, 1500);
 
     async function createGame() {
       const errorMsg = document.getElementById("errorMsg");
@@ -91,6 +195,8 @@
           errorMsg.textContent = res.error || "Nie udało się rozdzielić postaci.";
           return;
         }
+
+        window.location.href = `/player_page?t=${Date.now()}`;
       } catch (err) {
         console.error(err);
         errorMsg.textContent = "Błąd połączenia z serwerem.";
@@ -118,5 +224,17 @@
         errorMsg.textContent = "Błąd połączenia z serwerem.";
       }
     }
+
+    const showCharactersRow = document.getElementById("showCharactersRow");
+    const dayModeRow = document.getElementById("dayModeRow");
+    const nightModeRow = document.getElementById("nightModeRow");
+    const openPlayerPanelBtn = document.getElementById("openPlayerPanelBtn");
+
+    bindTap(showCharactersRow, showCharacters);
+    bindTap(dayModeRow, () => setGameMode("day"));
+    bindTap(nightModeRow, () => setGameMode("night"));
+    bindTap(openPlayerPanelBtn, () => {
+      window.location.href = openPlayerPanelBtn.dataset.href;
+    });
   </script>
 {% endblock %}

@@ -915,11 +915,10 @@ def index():
         return render_template(
             "index.html",
             name=db_players[client_id]["name"],
-            character=db_players[client_id]["character"],
             numer_miejsca=db_players[client_id].get("seat", ""),
         )
     else:
-        return render_template("index.html", name="", character="", numer_miejsca="")
+        return render_template("index.html", name="", numer_miejsca="")
 
 
 @app.route("/resume-session", methods=["POST"])
@@ -938,20 +937,29 @@ def resume_session():
 def save_player():
     data = request.get_json()
     name = data.get("name")
-    character = data.get("character")
     raw_seat = data.get("numer_miejsca")
+    moderator_login_requested = bool(data.get("moderator_login"))
+    moderator_password = str(data.get("moderator_password") or "")
     client_id = data.get("clientId") or data.get("client_id")
     socket_sid = data.get("socketSid")
     session["client_id"] = client_id
-    is_admin_login = name == "admin" and character == "secret"
-    print(f"Save {name=}, {character=}, {raw_seat=}, {client_id=}, {socket_sid=}")
+    is_moderator_login = moderator_login_requested and moderator_password == "secret"
+    is_admin_login = name == "admin" or is_moderator_login
+    requires_seat = (not is_admin_login) or is_moderator_login
+    print(
+        f"Save {name=}, {raw_seat=}, {moderator_login_requested=}, "
+        f"{client_id=}, {socket_sid=}"
+    )
     
     if client_id:
-        if not name or not character:
+        if not name:
             return jsonify({"error": "Brak wymaganych danych"}), 400
 
+        if moderator_login_requested and moderator_password != "secret":
+            return jsonify({"error": "Nieprawidłowe hasło moderatora"}), 400
+
         seat = None
-        if not is_admin_login:
+        if requires_seat:
             try:
                 seat = parse_seat(raw_seat)
             except ValueError as exc:
@@ -976,11 +984,11 @@ def save_player():
                 remove_default_test_players()
 
         if client_id not in db_players:
-            print(f"Dodaje nowego gracza: {name}, postać: {character}, seat: {seat}")
+            print(f"Dodaje nowego gracza: {name}, seat: {seat}")
             db_players.add(client_id, { "name" : None, "character" : None, "seat": None, "executed": False, "vote_dead": True, "sid": None} )
 
         db_players[client_id]["name"] = name
-        db_players[client_id]["character"] = "admin" if is_admin_login else character
+        db_players[client_id]["character"] = "admin" if is_admin_login else ""
         db_players[client_id]["seat"] = seat
         db_players[client_id].setdefault("executed", False)
         db_players[client_id].setdefault("vote_dead", True)
@@ -1527,12 +1535,38 @@ def execution_vote_page():
 
     vote_context = build_execution_vote_page_context(client_id)
     if not vote_context:
-        return redirect(url_for("player_page"))
+        last_result = execution_vote_state.get("last_result")
+        if not last_result:
+            return redirect(url_for("player_page"))
+
+        vote_context = {
+            "vote_id": last_result.get("vote_id", 0),
+            "nominee_name": last_result.get("nominee_name") or "Nieznany",
+            "nominee_client_id": None,
+            "can_vote": False,
+            "has_voted": True,
+            "required_votes_cast": last_result.get("required_votes_total", 0),
+            "required_votes_total": last_result.get("required_votes_total", 0),
+            "yes_votes": last_result.get("yes_votes", 0),
+            "no_votes": last_result.get("no_votes", 0),
+        }
+
+        return render_template(
+            "execution_vote.html",
+            client_id=client_id,
+            vote_context=vote_context,
+            vote_result=last_result,
+            vote_closed=True,
+            error=(request.args.get("error") or "").strip(),
+            submitted=request.args.get("submitted") == "1",
+        )
 
     return render_template(
         "execution_vote.html",
         client_id=client_id,
         vote_context=vote_context,
+        vote_result=None,
+        vote_closed=False,
         error=(request.args.get("error") or "").strip(),
         submitted=request.args.get("submitted") == "1",
     )

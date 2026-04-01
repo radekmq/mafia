@@ -1,7 +1,7 @@
 import random
 import copy
 
-test_enabled = True
+test_enabled = False
 
 class Database:
     def __init__(self):

@@ -12,6 +12,14 @@
 </div>
 
 {% if is_admin %}
+<div style="display:flex; justify-content:center; margin-bottom: 12px;">
+  <button type="button" data-href="{{ url_for('handle_menu') }}" onclick="window.location.href=this.dataset.href">
+    Panel administratora
+  </button>
+</div>
+{% endif %}
+
+{% if is_admin %}
 <div class="container" id="adminCombinedPanel" style="margin-bottom: 16px;">
   <h3 style="text-align:center; margin-top: 0;">Panel administratora</h3>
   <p id="adminErrorMsg" style="color: red; font-weight: bold; text-align: center;"></p>

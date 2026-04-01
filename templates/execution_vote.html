@@ -8,7 +8,9 @@
 
   <p id="voteError" style="color: red; font-weight: bold; text-align: center;">{{ error }}</p>
   <p id="voteInfo" style="font-weight: bold; text-align: center;">
-    {% if submitted %}
+    {% if vote_result %}
+    {{ vote_result.message }} Wynik głosowania: TAK={{ vote_result.yes_votes }}, NIE={{ vote_result.no_votes }}.
+    {% elif submitted %}
     Twój głos został zapisany. Czekaj na zakończenie głosowania.
     {% elif vote_context.has_voted %}
     Ten gracz oddał już głos. Czekaj na zakończenie głosowania.
@@ -17,11 +19,15 @@
     {% endif %}
   </p>
 
+  {% if vote_closed %}
+  <p style="text-align: center; font-weight: bold;">Głosowanie zakończone dla nominowanego gracza: {{ vote_context.nominee_name }}.</p>
+  {% else %}
   <p style="text-align: center; font-weight: bold;">Czy chcesz wyeliminować gracza: {{ vote_context.nominee_name }} z gry?</p>
+  {% endif %}
   <p style="text-align: center;">Oddane głosy żywych: <span id="requiredVotesCast">{{ vote_context.required_votes_cast }}</span> / <span id="requiredVotesTotal">{{ vote_context.required_votes_total }}</span></p>
   <p style="text-align: center;">Aktualny wynik: TAK <span id="yesVotes">{{ vote_context.yes_votes }}</span>, NIE <span id="noVotes">{{ vote_context.no_votes }}</span></p>
 
-  <form id="executionVoteForm" method="post" action="{{ url_for('execution_vote_page') }}" {% if not vote_context.can_vote %}style="display: none;"{% endif %}>
+  <form id="executionVoteForm" method="post" action="{{ url_for('execution_vote_page') }}" {% if vote_closed or not vote_context.can_vote %}style="display: none;"{% endif %}>
     <input type="hidden" name="client_id" value="{{ client_id }}">
     <button type="submit" name="vote" value="tak">Głosuj TAK</button>
     <button type="submit" name="vote" value="nie">Głosuj NIE</button>
@@ -32,6 +38,9 @@
   </form>
 </div>
 
+<script id="executionVoteInitialResult" type="application/json">{{ (vote_result or {}) | tojson }}</script>
+<script id="executionVoteClosedState" type="application/json">{{ vote_closed | tojson }}</script>
+
 <script>
   const executionVoteForm = document.getElementById("executionVoteForm");
   const voteError = document.getElementById("voteError");
@@ -41,6 +50,8 @@
   const requiredVotesCast = document.getElementById("requiredVotesCast");
   const requiredVotesTotal = document.getElementById("requiredVotesTotal");
   const socketRef = window.socket || null;
+  const initialVoteResult = JSON.parse(document.getElementById("executionVoteInitialResult").textContent);
+  const voteClosed = JSON.parse(document.getElementById("executionVoteClosedState").textContent);
   let closedVoteId = null;
 
   function applyVoteResult(result) {
@@ -118,6 +129,10 @@
     socketRef.on("execution_vote_result", data => {
       applyVoteResult(data);
     });
+  }
+
+  if (voteClosed && initialVoteResult && initialVoteResult.vote_id) {
+    applyVoteResult(initialVoteResult);
   }
 
   pollVoteStatusFallback();

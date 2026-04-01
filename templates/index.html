@@ -6,7 +6,7 @@
 
   <div class="container">
     <h2>Witamy w grze Blood on the clocktower!</h2>
-    <p>Podaj swoje imię oraz nazwę swojej postacji aby wziąć w grze!</p>
+    <p>Podaj swoje imię oraz numer miejsca, aby dołączyć do gry!</p>
 
     <div style="overflow-x:auto;">
       <p id="errorMsg" style="color: red; font-weight: bold;"></p>
@@ -20,8 +20,16 @@
           <td><input type="number" id="numer_miejsca" min="1" placeholder="Gdzie siedzisz?" {% if numer_miejsca != "" %}value="{{ numer_miejsca }}"{% endif %}></td>
         </tr>
         <tr>
-          <td><label for="character">Nazwa postaci:</label></td>
-          <td><input type="text" id="character" placeholder="Twoja postać" {% if character %}value="{{ character }}"{% endif %}></td>
+          <td colspan="2" style="text-align: left;">
+            <label for="moderator_login">
+              <input type="checkbox" id="moderator_login">
+              Zaloguj jako moderator gry
+            </label>
+          </td>
+        </tr>
+        <tr id="moderatorPasswordRow" style="display: none;">
+          <td><label for="moderator_password">Hasło moderatora:</label></td>
+          <td><input type="password" id="moderator_password" placeholder="Podaj hasło"></td>
         </tr>
         <tr>
           <td colspan="2"><button id="saveBtn">Dołącz do gry</button></td>
@@ -36,9 +44,19 @@
     document.addEventListener("DOMContentLoaded", () => {
       const inputName = document.getElementById("name");
       const inputSeat = document.getElementById("numer_miejsca");
-      const inputCharacter = document.getElementById("character");
+      const moderatorLoginCheckbox = document.getElementById("moderator_login");
+      const moderatorPasswordRow = document.getElementById("moderatorPasswordRow");
+      const moderatorPasswordInput = document.getElementById("moderator_password");
       const saveBtn = document.getElementById("saveBtn");
       const errorMsg = document.getElementById("errorMsg");
+
+      moderatorLoginCheckbox.addEventListener("change", () => {
+        const isModeratorLogin = moderatorLoginCheckbox.checked;
+        moderatorPasswordRow.style.display = isModeratorLogin ? "table-row" : "none";
+        if (!isModeratorLogin) {
+          moderatorPasswordInput.value = "";
+        }
+      });
 
       const tryResumeSession = async () => {
         const activeClientId = window.clientId || clientId;
@@ -66,16 +84,21 @@
       saveBtn.addEventListener("click", async () => {
         const name = inputName.value.trim();
         const numerMiejsca = inputSeat.value.trim();
-        const character = inputCharacter.value.trim();
+        const isModeratorLogin = moderatorLoginCheckbox.checked;
+        const moderatorPassword = moderatorPasswordInput.value.trim();
         const activeClientId = window.clientId || clientId;
         const activeSocket = window.socket;
         const socketSid = activeSocket && activeSocket.connected ? activeSocket.id : null;
-        const isAdminLogin = name === "admin" && character === "secret";
 
         errorMsg.textContent = "";
 
-        if (!name || !character || (!isAdminLogin && !numerMiejsca)) {
-          errorMsg.textContent = "Podaj imię, numer miejsca i nazwę postaci, zanim zapiszesz!";
+        if (!name || !numerMiejsca) {
+          errorMsg.textContent = "Podaj imię i numer miejsca, zanim zapiszesz!";
+          return;
+        }
+
+        if (isModeratorLogin && !moderatorPassword) {
+          errorMsg.textContent = "Podaj hasło moderatora.";
           return;
         }
 
@@ -90,7 +113,8 @@
             body: JSON.stringify({
               name,
               numer_miejsca: numerMiejsca,
-              character,
+              moderator_login: isModeratorLogin,
+              moderator_password: moderatorPassword,
               clientId: activeClientId,
               socketSid: socketSid
             })

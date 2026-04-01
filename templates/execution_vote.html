@@ -19,6 +19,8 @@
     {% endif %}
   </p>
 
+  <p style="text-align: center;">Nominację zgłosił gracz: <strong>{{ vote_context.nominator_name }}</strong>{% if vote_context.nominator_seat %} (miejsce {{ vote_context.nominator_seat }}){% endif %}.</p>
+
   {% if vote_closed %}
   <p style="text-align: center; font-weight: bold;">Głosowanie zakończone dla nominowanego gracza: {{ vote_context.nominee_name }}.</p>
   {% else %}

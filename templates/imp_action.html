@@ -1,0 +1,36 @@
+{% extends "base.html" %}
+
+{% block title %}Blood on the clocktower – Akcja Impa{% endblock %}
+
+{% block content %}
+<div class="container" style="overflow-x:auto;">
+  <h3>Akcja Impa (noc)</h3>
+
+  {% if error %}
+  <p style="color: red; font-weight: bold; text-align: center;">{{ error }}</p>
+  {% endif %}
+
+  {% if saved and result_message %}
+  <p style="font-weight: bold; text-align: center;">{{ result_message }}</p>
+  {% endif %}
+
+  {% if used_night %}
+  <p style="font-weight: bold; text-align: center;">Akcja Impa została już wykonana tej nocy.</p>
+  {% else %}
+  <form method="POST" style="margin-top: 16px;">
+    <label for="target_client_id">Wybierz gracza do wyeliminowania:</label>
+    <select id="target_client_id" name="target_client_id" required>
+      {% for player in candidates %}
+      <option value="{{ player.client_id }}">
+        {{ player.name }}{% if player.seat %} (miejsce {{ player.seat }}){% endif %} - {% if player.executed %}wyeliminowany{% else %}żywy{% endif %}
+      </option>
+      {% endfor %}
+    </select>
+
+    <button type="submit" {% if is_executed %}disabled{% endif %}>Wykonaj akcję Impa</button>
+  </form>
+  {% endif %}
+
+  <button type="button" onclick="window.location.href='/player_page'">Wróć do strony gracza</button>
+</div>
+{% endblock %}

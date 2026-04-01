@@ -213,6 +213,14 @@
     }
 
     let clientId = localStorage.getItem("client_id");
+
+    const queryParams = new URLSearchParams(window.location.search);
+    const queryClientId = queryParams.get("client_id") || queryParams.get("clientId");
+    if (queryClientId) {
+      clientId = queryClientId;
+      localStorage.setItem("client_id", clientId);
+    }
+
     if (!clientId) {
       clientId = generateUUID();
       localStorage.setItem("client_id", clientId);
@@ -264,6 +272,7 @@
       socket.on("game_over", data => {
         const message = (data && data.message) ? data.message : "Koniec gry.";
         alert(message);
+        window.location.href = withClientId("/menu-koniec-gry");
       });
     } else {
       console.warn("socket.io nie jest dostępny - przejście na fallback HTTP");
@@ -291,6 +300,11 @@
         const data = await response.json();
         const currentPath = window.location.pathname || "";
         const onSupportedPage = executionVoteFallbackPaths.some(path => currentPath.startsWith(path));
+
+        if (data && data.winner && !currentPath.startsWith("/menu-koniec-gry")) {
+          window.location.href = withClientId("/menu-koniec-gry");
+          return;
+        }
 
         if (data && data.is_player && data.execution_vote_active && onSupportedPage && !currentPath.startsWith("/execution-vote")) {
           window.location.href = withClientId(`/execution-vote?t=${Date.now()}`);

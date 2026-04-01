@@ -23,6 +23,10 @@
       <td>Aktualny tryb:</td>
       <td><p id="adminAktualnyTryb" style="text-align: center; margin: 0;">{{ "Dzień" if current_mode == "day" else "Noc" }}</p></td>
     </tr>
+    <tr id="adminImpActionStatusRow" {% if current_mode != "night" %}style="display: none;"{% endif %}>
+      <td>Akcja Impa (noc):</td>
+      <td><p id="adminImpActionStatus" style="text-align: center; margin: 0;">{{ "Wykonana" if imp_action_done_night else "Imp jeszcze się zastanawia" }}</p></td>
+    </tr>
   </table>
 
   <div style="display:flex; gap:10px; flex-wrap:wrap; justify-content:center; margin-top: 12px;">
@@ -40,73 +44,132 @@
     <tr>
       <td colspan="2" data-key="player_status" style="white-space: pre-line;">{{ player_status }}</td>
     </tr>
+    <tr>
+      <td>Status gracza:</td>
+      <td>{{ "Martwy" if is_executed else "Żywy" }}</td>
+    </tr>
   </table>
 
   <div id="impNightControls" style="margin-top: 12px;">
-    <p id="impActionError" style="color: red; font-weight: bold;"></p>
-    <p id="impActionInfo" style="font-weight: bold;"></p>
-    <label for="impTargetSelect">Wybierz gracza do wyeliminowania:</label>
-    <select id="impTargetSelect">
-      {% for player in night_players %}
-      <option value="{{ player.client_id }}">
-        {{ player.name }}{% if player.seat %} (miejsce {{ player.seat }}){% endif %} - {% if player.executed %}wyeliminowany{% else %}żywy{% endif %}
-      </option>
-      {% endfor %}
-    </select>
-    <button id="impConfirmActionBtn" type="button">Wykonaj akcję Impa</button>
+    <button id="impOpenActionBtn" type="button" {% if imp_action_done_night or is_executed %}disabled{% endif %}>Wyeliminuj gracza</button>
+    {% if imp_action_done_night %}
+    <p style="font-weight: bold; text-align: center;">Akcja Impa została już wykonana tej nocy.</p>
+    {% endif %}
   </div>
+  {% elif is_minion %}
+  <table id="player_table" cellspacing="0" cellpadding="8">
+    <tr>
+      <td colspan="2" style="white-space: pre-line;">{{ minion_night_status }}</td>
+    </tr>
+    <tr>
+      <td>Status gracza:</td>
+      <td>{{ "Martwy" if is_executed else "Żywy" }}</td>
+    </tr>
+  </table>
   {% else %}
   <p style="text-align: center; font-weight: bold;">Tryb noc aktywowany, czekaj na rozpoczęcie dnia</p>
   {% endif %}
 </div>
 
-<script id="impNightStateData" type="application/json">{{ {"isImp": is_imp} | tojson }}</script>
+<script id="impNightViewData" type="application/json">{{ {"isImp": is_imp} | tojson }}</script>
 <script>
-  const impNightState = JSON.parse(document.getElementById("impNightStateData").textContent);
+  const impNightViewData = JSON.parse(document.getElementById("impNightViewData").textContent);
+  const isImpNightView = !!impNightViewData.isImp;
+  const socketRef = window.socket || null;
 
   function refreshPlayerPage() {
     window.location.href = `/player_page?t=${Date.now()}`;
   }
 
-  const isImpNightView = !!impNightState.isImp;
-  if (isImpNightView) {
-    const impTargetSelect = document.getElementById("impTargetSelect");
-    const impConfirmActionBtn = document.getElementById("impConfirmActionBtn");
-    const impActionError = document.getElementById("impActionError");
-    const impActionInfo = document.getElementById("impActionInfo");
+  function bindTap(element, handler) {
+    if (!element) {
+      return;
+    }
 
-    impConfirmActionBtn.addEventListener("click", () => {
-      const targetClientId = impTargetSelect.value;
-      impActionError.textContent = "";
-      impActionInfo.textContent = "Wysyłanie akcji...";
+    let touchHandled = false;
+    let lastHandledAt = 0;
 
-      socket.emit("imp_night_action", {
-        clientId: window.clientId,
-        target_client_id: targetClientId,
-      });
+    const runHandler = event => {
+      const now = Date.now();
+      if (now - lastHandledAt < 450) {
+        return;
+      }
+      lastHandledAt = now;
+
+      if (event && event.cancelable) {
+        event.preventDefault();
+      }
+
+      touchHandled = true;
+      handler();
+      setTimeout(() => {
+        touchHandled = false;
+      }, 350);
+    };
+
+    element.addEventListener("pointerup", event => {
+      if (event.pointerType === "mouse" && event.button !== 0) {
+        return;
+      }
+      runHandler(event);
     });
 
-    socket.on("imp_action_result", data => {
-      impActionError.textContent = "";
-      impActionInfo.textContent = data.message || "Akcja wykonana.";
-      refreshPlayerPage();
-    });
+    element.addEventListener(
+      "touchstart",
+      event => {
+        runHandler(event);
+      },
+      { passive: false }
+    );
 
-    socket.on("imp_action_error", data => {
-      impActionError.textContent = data.error || "Nie udało się wykonać akcji Impa.";
-      impActionInfo.textContent = "";
+    element.addEventListener(
+      "touchend",
+      event => {
+        if (touchHandled) {
+          return;
+        }
+        runHandler(event);
+      },
+      { passive: false }
+    );
+
+    element.addEventListener("click", event => {
+      if (touchHandled) {
+        event.preventDefault();
+        return;
+      }
+      handler();
     });
   }
 
-  socket.on("update_game_status", data => {
-    if (data.mode === "day") {
-      refreshPlayerPage();
-    }
-  });
+  if (isImpNightView) {
+    const impOpenActionBtn = document.getElementById("impOpenActionBtn");
+    bindTap(impOpenActionBtn, () => {
+      window.location.href = "/imp-akcja";
+    });
 
-  socket.on("force_player_page_refresh", () => {
-    refreshPlayerPage();
-  });
+    if (socketRef) {
+      socketRef.on("imp_action_result", () => {
+        refreshPlayerPage();
+      });
+
+      socketRef.on("imp_action_error", () => {
+        refreshPlayerPage();
+      });
+    }
+  }
+
+  if (socketRef) {
+    socketRef.on("update_game_status", data => {
+      if (data.mode === "day") {
+        refreshPlayerPage();
+      }
+    });
+
+    socketRef.on("force_player_page_refresh", () => {
+      refreshPlayerPage();
+    });
+  }
 </script>
 {% else %}
 <div class="container" style="overflow-x:auto;">
@@ -123,6 +186,10 @@
     </tr>
     <tr>
       <td colspan="2" data-key="player_status" style="white-space: pre-line;">{{ player_status }}</td>
+    </tr>
+    <tr>
+      <td>Status gracza:</td>
+      <td>{{ "Martwy" if is_executed else "Żywy" }}</td>
     </tr>
   </table>
 
@@ -329,6 +396,35 @@
       }
 
       const data = await response.json();
+
+      const adminLiczbaGraczy = document.getElementById("adminLiczbaGraczy");
+      const adminPostacieWylosowane = document.getElementById("adminPostacieWylosowane");
+      const adminAktualnyTryb = document.getElementById("adminAktualnyTryb");
+      const adminImpActionStatusRow = document.getElementById("adminImpActionStatusRow");
+      const adminImpActionStatus = document.getElementById("adminImpActionStatus");
+
+      if (adminLiczbaGraczy && typeof data.no_of_players !== "undefined") {
+        adminLiczbaGraczy.textContent = data.no_of_players;
+      }
+
+      if (adminPostacieWylosowane && typeof data.char_presented !== "undefined") {
+        adminPostacieWylosowane.textContent = data.char_presented ? "TAK" : "NIE";
+      }
+
+      if (adminAktualnyTryb && (data.mode === "day" || data.mode === "night")) {
+        adminAktualnyTryb.textContent = data.mode === "day" ? "Dzień" : "Noc";
+      }
+
+      if (adminImpActionStatusRow && (data.mode === "day" || data.mode === "night")) {
+        adminImpActionStatusRow.style.display = data.mode === "night" ? "table-row" : "none";
+      }
+
+      if (adminImpActionStatus && typeof data.imp_action_done_night !== "undefined") {
+        adminImpActionStatus.textContent = data.imp_action_done_night
+          ? "Wykonana"
+          : "Imp jeszcze się zastanawia";
+      }
+
       if (data.execution_vote_active) {
         window.location.href = `/execution-vote?t=${Date.now()}&client_id=${encodeURIComponent(window.clientId || "")}`;
         return;
@@ -376,6 +472,8 @@
     const adminLiczbaGraczy = document.getElementById("adminLiczbaGraczy");
     const adminPostacieWylosowane = document.getElementById("adminPostacieWylosowane");
     const adminAktualnyTryb = document.getElementById("adminAktualnyTryb");
+    const adminImpActionStatusRow = document.getElementById("adminImpActionStatusRow");
+    const adminImpActionStatus = document.getElementById("adminImpActionStatus");
 
     const adminShowCharactersBtn = document.getElementById("adminShowCharactersBtn");
     const adminDayModeBtn = document.getElementById("adminDayModeBtn");
@@ -438,6 +536,15 @@
 
       if (data.mode === "day" || data.mode === "night") {
         adminAktualnyTryb.textContent = data.mode === "day" ? "Dzień" : "Noc";
+        if (adminImpActionStatusRow) {
+          adminImpActionStatusRow.style.display = data.mode === "night" ? "table-row" : "none";
+        }
+      }
+
+      if (typeof data.imp_action_done_night !== "undefined" && adminImpActionStatus) {
+        adminImpActionStatus.textContent = data.imp_action_done_night
+          ? "Wykonana"
+          : "Imp jeszcze się zastanawia";
       }
     });
   })();

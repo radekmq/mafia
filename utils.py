@@ -196,6 +196,32 @@ def assign_players_to_characters(client_ids, trouble_brewing_setup, db_character
         f"{[c['name'] for c in all_characters]}"
     )
 
+    # Kontrola zgodnosci liczby postaci z setupem.
+    expected_counts = {
+        "Mieszkańcy": setup["Mieszkańcy"],
+        "Outsiderzy": setup["Outsiderzy"],
+        "Minionki": setup["Minionki"],
+        "Demon": setup["Demon"],
+    }
+    actual_counts = {
+        "Mieszkańcy": len(new_db_characters["Mieszkańcy"]),
+        "Outsiderzy": len(new_db_characters["Outsiderzy"]),
+        "Minionki": len(new_db_characters["Minionki"]),
+        "Demon": len(new_db_characters["Demon"]),
+    }
+
+    print("[assign_players_to_characters] Kontrola zgodnosci z trouble_brewing_setup:")
+    for category in ["Mieszkańcy", "Outsiderzy", "Minionki", "Demon"]:
+        print(
+            "[assign_players_to_characters] "
+            f"{category}: expected={expected_counts[category]}, actual={actual_counts[category]}"
+        )
+        if actual_counts[category] != expected_counts[category]:
+            raise ValueError(
+                "Niezgodna liczba postaci po losowaniu dla kategorii "
+                f"{category}: expected={expected_counts[category]}, actual={actual_counts[category]}"
+            )
+
     drunk_extra_pending = None
     imp_extra_pending = None
 
@@ -213,6 +239,11 @@ def assign_players_to_characters(client_ids, trouble_brewing_setup, db_character
         elif char["name"] == "Imp":
             imp_extra_pending = client_id
 
+    if imp_extra_pending:
+        print(f"[assign_players_to_characters] Imp zostal przypisany do gracza client_id={imp_extra_pending}")
+    else:
+        print("[assign_players_to_characters] UWAGA: Imp nie zostal przypisany")
+
     print(f"[assign_players_to_characters] drunk_extra_pending={drunk_extra_pending}")
     print(f"[assign_players_to_characters] imp_extra_pending={imp_extra_pending}")
 
@@ -228,24 +259,20 @@ def assign_players_to_characters(client_ids, trouble_brewing_setup, db_character
         if remaining_townsfolk:
             extra = random.choice(remaining_townsfolk)
             extra["wybrany"] = True  # oznacz w oryginalnej bazie, by już nie był dostępny
-            extra_copy = copy.deepcopy(extra)
-            extra_copy["client_id"] = drunk_extra_pending
-            extra_copy["numer_siedzenia"] = None
-            new_db_characters["Mieszkańcy"].append(extra_copy)
             print(
                 f"[assign_players_to_characters] Pijak client_id={drunk_extra_pending} "
-                f"otrzymal dodatkowa postac={extra_copy['name']}"
+                f"otrzymal maskowana postac={extra['name']}"
             )
 
-            # dopisz w rekordzie Pijaka jego dodatkową postać (lista) i mapowanie maski
+            # Zapisz tylko metadane maskowania; nie dodawaj postaci do puli gry.
             for category in new_db_characters.values():
                 for c in category:
                     if c["name"] == "Pijak" and c["client_id"] == drunk_extra_pending:
-                        c["druga_postac"] = [extra_copy["name"]]
-                        c["drunk_role_name"] = extra_copy["name"]
+                        c["druga_postac"] = [extra["name"]]
+                        c["drunk_role_name"] = extra["name"]
                         print(
                             "[assign_players_to_characters] Ustawiono maskowanie Pijaka: "
-                            f"client_id={drunk_extra_pending}, real_role=Pijak, visible_role={extra_copy['name']}"
+                            f"client_id={drunk_extra_pending}, real_role=Pijak, visible_role={extra['name']}"
                         )
         else:
             print("[assign_players_to_characters] Brak dodatkowej postaci dla Pijaka")
@@ -268,14 +295,8 @@ def assign_players_to_characters(client_ids, trouble_brewing_setup, db_character
             # oznacz te postacie jako zużyte
             for e in extra_three:
                 e["wybrany"] = True
-            # dodaj ich kopie do nowej bazy, przypisane do tego samego gracza (Impa)
-            for e in extra_three:
-                extra_copy = copy.deepcopy(e)
-                extra_copy["client_id"] = imp_extra_pending
-                extra_copy["numer_siedzenia"] = None
-                new_db_characters["Mieszkańcy"].append(extra_copy)
 
-            # dopisz w rekordzie Impa jego dodatkowe postacie
+            # Zapisz tylko listę blefów dla Impa; nie dodawaj postaci do puli gry.
             for category in new_db_characters.values():
                 for c in category:
                     if c["name"] == "Imp" and c["client_id"] == imp_extra_pending:
@@ -320,6 +341,16 @@ def fun_praczka(characters, players, drunk=False):
     print(characters)
     all_chars = [c for chars in characters.values() for c in chars]
     mieszkancy = characters.get("Mieszkańcy", [])
+
+    praczka_character = None
+    for char in mieszkancy:
+        if char.get("name") == "Praczka" and char.get("client_id") in players:
+            praczka_character = char
+            break
+
+    if praczka_character and praczka_character.get("praczka_once_status"):
+        return praczka_character["praczka_once_status"]
+
     # Bierz pod uwage tylko postacie realnie uczestniczace w grze (z numerem miejsca).
     assigned_chars = [
         c for c in all_chars if c.get("client_id") in players and c.get("numer_siedzenia") is not None
@@ -358,6 +389,7 @@ def fun_praczka(characters, players, drunk=False):
             f"Tylko jeden z graczy: {name1} oraz {name2} "
             f"ma postać: {mieszkaniec['name']}"
         )
+        print(f"[fun_praczka] Tryb pijany - zwracam losową informację: {tekst}")
 
     else:
         # --- Tryb normalny ---
@@ -391,6 +423,8 @@ def fun_praczka(characters, players, drunk=False):
             f"ma postać: {mieszkaniec['name']}"
         )
 
+    if praczka_character:
+        praczka_character["praczka_once_status"] = tekst
     return tekst
 
 
@@ -406,6 +440,16 @@ def fun_bibliotekarka(characters, players, drunk=False):
 
     all_chars = [c for chars in characters.values() for c in chars]
     outsiderzy = characters.get("Outsiderzy", [])
+
+    bibliotekarka_character = None
+    for char in characters.get("Mieszkańcy", []):
+        if char.get("name") == "Bibliotekarka" and char.get("client_id") in players:
+            bibliotekarka_character = char
+            break
+
+    if bibliotekarka_character and bibliotekarka_character.get("bibliotekarka_once_status"):
+        return bibliotekarka_character["bibliotekarka_once_status"]
+
     # Bierz pod uwage tylko postacie realnie uczestniczace w grze (z numerem miejsca).
     assigned_chars = [
         c for c in all_chars if c.get("client_id") in players and c.get("numer_siedzenia") is not None
@@ -438,6 +482,7 @@ def fun_bibliotekarka(characters, players, drunk=False):
             f"Tylko jeden z graczy: {name1} oraz {name2} "
             f"ma postać: {outsider_name}"
         )
+        print(f"[fun_bibliotekarka] Tryb pijany - zwracam losową informację: {tekst}")
 
     else:
         if assigned_outsiderzy:
@@ -468,6 +513,8 @@ def fun_bibliotekarka(characters, players, drunk=False):
         else:
             tekst = "Żaden Outsider nie jest w grze."
 
+    if bibliotekarka_character:
+        bibliotekarka_character["bibliotekarka_once_status"] = tekst
     return tekst
 
 def fun_detektyw(characters, players, drunk=False, poisoned=False):
@@ -481,6 +528,15 @@ def fun_detektyw(characters, players, drunk=False, poisoned=False):
     assigned_chars = [c for c in all_chars if c.get("client_id") in players]
     assigned_minionki = [c for c in minionki if c.get("client_id") in players]
 
+    detektyw_character = None
+    for char in characters.get("Mieszkańcy", []):
+        if char.get("name") == "Detektyw" and char.get("client_id") in players:
+            detektyw_character = char
+            break
+
+    if detektyw_character and detektyw_character.get("detektyw_once_status"):
+        return detektyw_character["detektyw_once_status"]
+
     if len(players) < 2:
         return "Brak wystarczającej liczby graczy do losowania."
 
@@ -491,6 +547,32 @@ def fun_detektyw(characters, players, drunk=False, poisoned=False):
             return players[client_id].get("name", "Nieznany")
         except KeyError:
             return "Nieznany"
+
+    if drunk or poisoned:
+        available_role_names = [
+            char.get("name", "Nieznana postać")
+            for char in assigned_chars
+            if char.get("name") != "Detektyw"
+        ]
+
+        if not available_role_names:
+            return "Brak dostępnej postaci do fałszywej informacji Detektywa."
+
+        losowa_postac = random.choice(available_role_names)
+        wszyscy_gracze = list(players.get_all().values())
+        losowi_gracze = random.sample(wszyscy_gracze, 2)
+        name1, name2 = losowi_gracze[0]["name"], losowi_gracze[1]["name"]
+
+        
+        status_text = (
+            f"Tylko jeden z graczy: {name1} oraz {name2} "
+            f"ma postać: {losowa_postac}"
+        )
+        print(f"[fun_detektyw] Tryb pijany/truty - zwracam losową informację: {status_text}")
+
+        if detektyw_character:
+            detektyw_character["detektyw_once_status"] = status_text
+        return status_text
 
     if assigned_minionki:
         minion = random.choice(assigned_minionki)
@@ -511,18 +593,25 @@ def fun_detektyw(characters, players, drunk=False, poisoned=False):
         names = [name1, name2]
         random.shuffle(names)
 
-        return (
+        status_text = (
             f"Tylko jeden z graczy: {names[0]} oraz {names[1]} "
             f"ma postać: {minion['name']}"
         )
 
+        if detektyw_character:
+            detektyw_character["detektyw_once_status"] = status_text
+        return status_text
+
     wszyscy_gracze = list(players.get_all().values())
     losowi_gracze = random.sample(wszyscy_gracze, 2)
     name1, name2 = losowi_gracze[0]["name"], losowi_gracze[1]["name"]
-    return (
+    status_text = (
         f"Żaden Minion nie jest w grze. "
         f"Przykładowi gracze: {name1} oraz {name2}."
     )
+    if detektyw_character:
+        detektyw_character["detektyw_once_status"] = status_text
+    return status_text
 
 def fun_kucharz(characters, players, drunk=False, poisoned=False):
     """
@@ -530,6 +619,15 @@ def fun_kucharz(characters, players, drunk=False, poisoned=False):
     Informuje, ile par złych postaci (Minionki lub Demon) siedzi obok siebie.
     Sąsiedztwo liczone jest po okręgu, więc pierwszy i ostatni gracz też sąsiadują.
     """
+
+    kucharz_character = None
+    for char in characters.get("Mieszkańcy", []):
+        if char.get("name") == "Kucharz" and char.get("client_id") in players:
+            kucharz_character = char
+            break
+
+    if kucharz_character and kucharz_character.get("kucharz_once_status"):
+        return kucharz_character["kucharz_once_status"]
 
     if len(players) < 2:
         return "Brak wystarczającej liczby graczy do losowania."
@@ -542,8 +640,12 @@ def fun_kucharz(characters, players, drunk=False, poisoned=False):
     }
 
     if drunk or poisoned:
+        print("[fun_kucharz] Tryb pijany/truty - zwracam losową liczbę par złych postaci (0-5)")
         max_pairs = (len(bad_client_ids) // 2) + 1
-        return f"Liczba par złych postaci siedzących obok siebie: {random.randint(0, max_pairs)}."
+        status_text = f"Liczba par złych postaci siedzących obok siebie: {random.randint(0, max_pairs)}."
+        if kucharz_character:
+            kucharz_character["kucharz_once_status"] = status_text
+        return status_text
 
     seated_players = []
     for client_id, player in players.get_all().items():
@@ -568,7 +670,10 @@ def fun_kucharz(characters, players, drunk=False, poisoned=False):
         if current_player["is_bad"] and next_player["is_bad"]:
             bad_pairs += 1
 
-    return f"Liczba par złych postaci siedzących obok siebie: {bad_pairs}."
+    status_text = f"Liczba par złych postaci siedzących obok siebie: {bad_pairs}."
+    if kucharz_character:
+        kucharz_character["kucharz_once_status"] = status_text
+    return status_text
 
 def fun_empata(characters, players, drunk=False, poisoned=False):
     """
@@ -581,6 +686,7 @@ def fun_empata(characters, players, drunk=False, poisoned=False):
         return "Brak wystarczającej liczby graczy do działania Empaty."
 
     if drunk or poisoned:
+        print("[fun_empata] Tryb pijany/truty - zwracam losową liczbę złych sąsiadów (0-2)")
         return (
             "Liczba żyjących złych sąsiadów Empaty "
             f"(Minionki + Demon): {random.randint(0, 2)}."
@@ -631,8 +737,23 @@ def fun_empata(characters, players, drunk=False, poisoned=False):
     if empath_index is None:
         return "Nie znaleziono Empaty przy stole."
 
-    left_neighbor = seated_players[(empath_index - 1) % len(seated_players)]
-    right_neighbor = seated_players[(empath_index + 1) % len(seated_players)]
+    def find_next_alive_neighbor(start_index, step):
+        total_players = len(seated_players)
+        cursor = start_index
+
+        for _ in range(total_players - 1):
+            cursor = (cursor + step) % total_players
+            candidate = seated_players[cursor]
+            if candidate["client_id"] == empath_client_id:
+                continue
+            if candidate["executed"]:
+                continue
+            return candidate
+
+        return None
+
+    left_neighbor = find_next_alive_neighbor(empath_index, -1)
+    right_neighbor = find_next_alive_neighbor(empath_index, 1)
 
     evil_client_ids = {
         char.get("client_id")
@@ -642,7 +763,7 @@ def fun_empata(characters, players, drunk=False, poisoned=False):
 
     evil_neighbors = 0
     for neighbor in [left_neighbor, right_neighbor]:
-        if neighbor["executed"]:
+        if not neighbor:
             continue
         if neighbor["client_id"] in evil_client_ids:
             evil_neighbors += 1
@@ -659,9 +780,6 @@ def fun_jasnowidz(characters, players, drunk=False, poisoned=False, mode="day", 
     czy w tej parze znajduje się Demon (Imp).
     """
 
-    _ = drunk
-    _ = poisoned
-
     all_players = players.get_all()
     if not all_players:
         return "Brak graczy w bazie."
@@ -677,6 +795,26 @@ def fun_jasnowidz(characters, players, drunk=False, poisoned=False, mode="day", 
 
     if mode != "day":
         return "Akcja Jasnowidza jest dostępna tylko w ciągu dnia."
+
+    if drunk or poisoned:
+        players_list = [
+            player.get("name", "Nieznany")
+            for _, player in sorted(all_players.items(), key=lambda item: item[1].get("seat") or 9999)
+        ]
+
+        if len(players_list) >= 2:
+            first_name, second_name = random.sample(players_list, 2)
+        elif len(players_list) == 1:
+            first_name, second_name = players_list[0], players_list[0]
+        else:
+            first_name, second_name = "Nieznany", "Nieznany"
+
+        random_answer = random.choice(["TAK", "NIE"])
+        print(f"[fun_jasnowidz] Tryb pijany/truty - zwracam losową informację: Pytanie o parę ({first_name}, {second_name}) -> Czy jest tam Imp? {random_answer}")
+        return (
+            "Przypadkowa informacja Jasnowidza: "
+            f"Pytanie o parę ({first_name}, {second_name}) -> Czy jest tam Imp? {random_answer}."
+        )
 
     used_day = jasnowidz_character.get("jasnowidz_last_day_used")
     last_result = jasnowidz_character.get("jasnowidz_daily_result")

@@ -1,0 +1,52 @@
+{% extends "base.html" %}
+
+{% block title %}Akcja Jasnowidza{% endblock %}
+
+{% block content %}
+<div class="container" style="max-width: 760px;">
+  <h2 style="margin-top: 0; text-align: center;">Akcja Jasnowidza</h2>
+
+  <p style="text-align: center;"><strong>Dzień {{ day_number }}</strong></p>
+  <p style="white-space: pre-line; font-weight: bold;">{{ status_text }}</p>
+
+  {% if error %}
+  <p style="color: red; font-weight: bold; text-align: center;">{{ error }}</p>
+  {% endif %}
+
+  {% if saved %}
+  <p style="font-weight: bold; text-align: center;">Dzisiejsze pytanie Jasnowidza zostało zapisane.</p>
+  {% endif %}
+
+  {% if not used_today and not is_executed %}
+  <form method="post" action="{{ url_for('jasnowidz_action_page') }}">
+    <label for="first_target_client_id" style="display: block; text-align: center; font-weight: bold;">
+      Pierwszy gracz:
+    </label>
+    <select id="first_target_client_id" name="first_target_client_id" required>
+      {% for player in candidates %}
+      <option value="{{ player.client_id }}">
+        {{ player.name }}{% if player.seat %} (miejsce {{ player.seat }}){% endif %}
+      </option>
+      {% endfor %}
+    </select>
+
+    <label for="second_target_client_id" style="display: block; text-align: center; font-weight: bold; margin-top: 8px;">
+      Drugi gracz:
+    </label>
+    <select id="second_target_client_id" name="second_target_client_id" required>
+      {% for player in candidates %}
+      <option value="{{ player.client_id }}">
+        {{ player.name }}{% if player.seat %} (miejsce {{ player.seat }}){% endif %}
+      </option>
+      {% endfor %}
+    </select>
+
+    <button type="submit">Sprawdź parę graczy</button>
+  </form>
+  {% endif %}
+
+  <form method="get" action="{{ url_for('player_page') }}">
+    <button type="submit">Wróć do strony gracza</button>
+  </form>
+</div>
+{% endblock %}

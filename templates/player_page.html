@@ -128,37 +128,14 @@
 
   <div id="executionControls" style="margin-top: 20px;">
     <button id="nominateBtn" type="button" style="display: none;">Nominuj do wyeliminowania</button>
+    {% if is_jasnowidz %}
+    <button id="jasnowidzOpenBtn" type="button" {% if jasnowidz_used_today or is_executed %}disabled{% endif %}>Akcja jasnowidza</button>
+    {% endif %}
     <button id="wikiBtn" type="button">Wiki z listą postaci</button>
     {% if is_admin %}
     <button id="adminPanelBtn" type="button">Panel administratora</button>
     {% endif %}
   </div>
-
-  {% if is_jasnowidz %}
-  <div id="jasnowidzControls" style="margin-top: 20px;">
-    <p><strong>Dzień {{ day_number }}</strong></p>
-    <p id="jasnowidzError" style="color: red; font-weight: bold;"></p>
-    <p id="jasnowidzInfo" style="font-weight: bold;"></p>
-
-    <label for="jasnowidzFirstTarget">Pierwszy gracz:</label>
-    <select id="jasnowidzFirstTarget">
-      {% for player in night_players %}
-      <option value="{{ player.client_id }}">{{ player.name }}{% if player.seat %} (miejsce {{ player.seat }}){% endif %}</option>
-      {% endfor %}
-    </select>
-
-    <label for="jasnowidzSecondTarget">Drugi gracz:</label>
-    <select id="jasnowidzSecondTarget">
-      {% for player in night_players %}
-      <option value="{{ player.client_id }}">{{ player.name }}{% if player.seat %} (miejsce {{ player.seat }}){% endif %}</option>
-      {% endfor %}
-    </select>
-
-    <button id="jasnowidzAskBtn" type="button" {% if jasnowidz_used_today or is_executed %}disabled{% endif %}>
-      Zadaj pytanie Jasnowidza
-    </button>
-  </div>
-  {% endif %}
 
   {% if is_truciciel %}
   <div id="trucicielControls" style="margin-top: 20px;">
@@ -181,14 +158,9 @@
   const jasnowidzState = JSON.parse(document.getElementById("jasnowidzStateData").textContent);
 
   const nominateBtn = document.getElementById("nominateBtn");
+  const jasnowidzOpenBtn = document.getElementById("jasnowidzOpenBtn");
   const wikiBtn = document.getElementById("wikiBtn");
   const adminPanelBtn = document.getElementById("adminPanelBtn");
-
-  const jasnowidzError = document.getElementById("jasnowidzError");
-  const jasnowidzInfo = document.getElementById("jasnowidzInfo");
-  const jasnowidzAskBtn = document.getElementById("jasnowidzAskBtn");
-  const jasnowidzFirstTarget = document.getElementById("jasnowidzFirstTarget");
-  const jasnowidzSecondTarget = document.getElementById("jasnowidzSecondTarget");
 
   const trucicielOpenBtn = document.getElementById("trucicielOpenBtn");
 
@@ -274,23 +246,9 @@
 
   renderNominationControls();
 
-  if (jasnowidzState.isJasnowidz && jasnowidzAskBtn) {
-    if (jasnowidzState.usedToday) {
-      jasnowidzInfo.textContent = "Dzisiejsze pytanie Jasnowidza zostało już wykorzystane.";
-    }
-
-    bindTap(jasnowidzAskBtn, () => {
-      const firstTarget = jasnowidzFirstTarget.value;
-      const secondTarget = jasnowidzSecondTarget.value;
-
-      jasnowidzError.textContent = "";
-      jasnowidzInfo.textContent = "";
-
-      socket.emit("jasnowidz_day_action", {
-        clientId: playerState.clientId,
-        first_target_client_id: firstTarget,
-        second_target_client_id: secondTarget,
-      });
+  if (jasnowidzState.isJasnowidz && jasnowidzOpenBtn) {
+    bindTap(jasnowidzOpenBtn, () => {
+      window.location.href = "/jasnowidz-akcja";
     });
   }
 
@@ -310,28 +268,6 @@
 
   bindTap(adminPanelBtn, () => {
     window.location.href = "{{ url_for('handle_menu') }}";
-  });
-
-  socket.on("jasnowidz_action_error", data => {
-    if (!jasnowidzState.isJasnowidz || !jasnowidzError) {
-      return;
-    }
-    jasnowidzError.textContent = data.error || "Nie udało się wykonać akcji Jasnowidza.";
-    if (jasnowidzInfo) {
-      jasnowidzInfo.textContent = "";
-    }
-  });
-
-  socket.on("jasnowidz_action_result", data => {
-    if (!jasnowidzState.isJasnowidz || !jasnowidzInfo) {
-      return;
-    }
-    jasnowidzError.textContent = "";
-    jasnowidzInfo.textContent = data.message || "Akcja Jasnowidza wykonana.";
-    if (jasnowidzAskBtn) {
-      jasnowidzAskBtn.disabled = true;
-    }
-    refreshPlayerPage();
   });
 
   socket.on("update_player_status", data => {

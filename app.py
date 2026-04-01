@@ -503,6 +503,65 @@ def perform_truciciel_day_action(actor_client_id, target_client_id):
     return None, result_message
 
 
+def perform_jasnowidz_day_action(actor_client_id, first_target_client_id, second_target_client_id):
+    if not db_game_selection:
+        return "Brak aktywnej rozgrywki.", None
+
+    if db_game.get("mode") != "day":
+        return "Akcja Jasnowidza jest dostępna tylko w dzień.", None
+
+    if not actor_client_id or actor_client_id not in db_players:
+        return "Nie znaleziono gracza wykonującego akcję.", None
+
+    if not first_target_client_id or first_target_client_id not in db_players:
+        return "Nie znaleziono pierwszego celu.", None
+
+    if not second_target_client_id or second_target_client_id not in db_players:
+        return "Nie znaleziono drugiego celu.", None
+
+    if first_target_client_id == second_target_client_id:
+        return "Wybierz dwóch różnych graczy.", None
+
+    ensure_player_flags(db_players[actor_client_id])
+    if db_players[actor_client_id]["executed"]:
+        return "Wyeliminowany Jasnowidz nie może wykonać akcji.", None
+
+    real_character, _ = get_player_character_views(actor_client_id)
+    if not real_character or real_character.get("name") != "Jasnowidz":
+        return "Tylko Jasnowidz może wykonać tę akcję.", None
+
+    day_number = db_game.get("day_number", 1)
+    if real_character.get("jasnowidz_last_day_used") == day_number:
+        return "Dzisiaj wykorzystałeś już pytanie Jasnowidza.", None
+
+    imp_client_ids = {
+        char.get("client_id")
+        for char in db_game_selection.get("Demon", [])
+        if char.get("name") == "Imp" and char.get("client_id") in db_players
+    }
+
+    target_pair = {first_target_client_id, second_target_client_id}
+    has_imp = any(client_id in imp_client_ids for client_id in target_pair)
+
+    if is_client_poisoned_today(actor_client_id, day_number):
+        has_imp = random.choice([True, False])
+
+    answer = "TAK" if has_imp else "NIE"
+
+    first_name = db_players[first_target_client_id].get("name", "Nieznany")
+    second_name = db_players[second_target_client_id].get("name", "Nieznany")
+    result_message = (
+        f"Pytanie o parę ({first_name}, {second_name}) -> Czy jest tam Imp? {answer}."
+    )
+
+    real_character["jasnowidz_last_day_used"] = day_number
+    real_character["jasnowidz_daily_result"] = result_message
+    real_character.pop("resolved_player_status", None)
+    real_character.pop("resolved_player_status_key", None)
+
+    return None, result_message
+
+
 def finalize_execution_vote_if_ready(force=False):
     if not execution_vote_state["active"]:
         return
@@ -822,70 +881,14 @@ def handle_jasnowidz_day_action(data):
     actor_client_id = data.get("clientId") or data.get("client_id")
     first_target_client_id = data.get("first_target_client_id")
     second_target_client_id = data.get("second_target_client_id")
-
-    if not db_game_selection:
-        emit("jasnowidz_action_error", {"error": "Brak aktywnej rozgrywki."})
-        return
-
-    if db_game.get("mode") != "day":
-        emit("jasnowidz_action_error", {"error": "Akcja Jasnowidza jest dostępna tylko w dzień."})
-        return
-
-    if not actor_client_id or actor_client_id not in db_players:
-        emit("jasnowidz_action_error", {"error": "Nie znaleziono gracza wykonującego akcję."})
-        return
-
-    if not first_target_client_id or first_target_client_id not in db_players:
-        emit("jasnowidz_action_error", {"error": "Nie znaleziono pierwszego celu."})
-        return
-
-    if not second_target_client_id or second_target_client_id not in db_players:
-        emit("jasnowidz_action_error", {"error": "Nie znaleziono drugiego celu."})
-        return
-
-    if first_target_client_id == second_target_client_id:
-        emit("jasnowidz_action_error", {"error": "Wybierz dwóch różnych graczy."})
-        return
-
-    ensure_player_flags(db_players[actor_client_id])
-    if db_players[actor_client_id]["executed"]:
-        emit("jasnowidz_action_error", {"error": "Wyeliminowany Jasnowidz nie może wykonać akcji."})
-        return
-
-    real_character, _ = get_player_character_views(actor_client_id)
-    if not real_character or real_character.get("name") != "Jasnowidz":
-        emit("jasnowidz_action_error", {"error": "Tylko Jasnowidz może wykonać tę akcję."})
-        return
-
-    day_number = db_game.get("day_number", 1)
-    if real_character.get("jasnowidz_last_day_used") == day_number:
-        emit("jasnowidz_action_error", {"error": "Dzisiaj wykorzystałeś już pytanie Jasnowidza."})
-        return
-
-    imp_client_ids = {
-        char.get("client_id")
-        for char in db_game_selection.get("Demon", [])
-        if char.get("name") == "Imp" and char.get("client_id") in db_players
-    }
-
-    target_pair = {first_target_client_id, second_target_client_id}
-    has_imp = any(client_id in imp_client_ids for client_id in target_pair)
-
-    if is_client_poisoned_today(actor_client_id, day_number):
-        has_imp = random.choice([True, False])
-
-    answer = "TAK" if has_imp else "NIE"
-
-    first_name = db_players[first_target_client_id].get("name", "Nieznany")
-    second_name = db_players[second_target_client_id].get("name", "Nieznany")
-    result_message = (
-        f"Pytanie o parę ({first_name}, {second_name}) -> Czy jest tam Imp? {answer}."
+    error, result_message = perform_jasnowidz_day_action(
+        actor_client_id,
+        first_target_client_id,
+        second_target_client_id,
     )
-
-    real_character["jasnowidz_last_day_used"] = day_number
-    real_character["jasnowidz_daily_result"] = result_message
-    real_character.pop("resolved_player_status", None)
-    real_character.pop("resolved_player_status_key", None)
+    if error:
+        emit("jasnowidz_action_error", {"error": error})
+        return
 
     emit("jasnowidz_action_result", {"message": result_message})
     emit("force_player_page_refresh", {})
@@ -1606,6 +1609,51 @@ def truciciel_action_page():
 
     return render_template(
         "truciciel_action.html",
+        day_number=day_number,
+        candidates=get_sorted_player_options(),
+        is_executed=db_players[client_id]["executed"],
+        used_today=used_today,
+        status_text=get_stable_player_status(visible_character),
+        error=error,
+        saved=request.args.get("saved") == "1",
+    )
+
+
+@app.route("/jasnowidz-akcja", methods=["GET", "POST"])
+def jasnowidz_action_page():
+    client_id = session.get("client_id")
+    if not client_id or client_id not in db_players:
+        return redirect(url_for("index"))
+
+    if not db_game_selection:
+        return redirect(url_for("player_page"))
+
+    if execution_vote_state["active"]:
+        return redirect(url_for("execution_vote_page"))
+
+    ensure_player_flags(db_players[client_id])
+    real_character, visible_character = get_player_character_views(client_id)
+    if not real_character or real_character.get("name") != "Jasnowidz":
+        return redirect(url_for("player_page"))
+
+    if db_game.get("mode") != "day":
+        return redirect(url_for("player_page"))
+
+    error = ""
+
+    if request.method == "POST":
+        first_target_client_id = (request.form.get("first_target_client_id") or "").strip()
+        second_target_client_id = (request.form.get("second_target_client_id") or "").strip()
+        error, _ = perform_jasnowidz_day_action(client_id, first_target_client_id, second_target_client_id)
+        if not error:
+            socketio.emit("force_player_page_refresh", {})
+            return redirect(url_for("jasnowidz_action_page", saved="1"))
+
+    day_number = db_game.get("day_number", 1)
+    used_today = real_character.get("jasnowidz_last_day_used") == day_number
+
+    return render_template(
+        "jasnowidz_action.html",
         day_number=day_number,
         candidates=get_sorted_player_options(),
         is_executed=db_players[client_id]["executed"],

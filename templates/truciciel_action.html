@@ -1,0 +1,42 @@
+{% extends "base.html" %}
+
+{% block title %}Akcja Truciciela{% endblock %}
+
+{% block content %}
+<div class="container" style="max-width: 760px;">
+  <h2 style="margin-top: 0; text-align: center;">Akcja Truciciela</h2>
+
+  <p style="text-align: center;"><strong>Dzień {{ day_number }}</strong></p>
+  <p style="white-space: pre-line; font-weight: bold;">{{ status_text }}</p>
+
+  {% if error %}
+  <p style="color: red; font-weight: bold; text-align: center;">{{ error }}</p>
+  {% endif %}
+
+  {% if saved %}
+  <p style="font-weight: bold; text-align: center;">Dzisiejszy wybór został zapisany.</p>
+  {% endif %}
+
+  {% if not used_today and not is_executed %}
+  <form method="post" action="{{ url_for('truciciel_action_page') }}">
+    <label for="target_client_id" style="display: block; text-align: center; font-weight: bold;">
+      Wybierz gracza do zatrucia od kolejnego dnia:
+    </label>
+
+    <select id="target_client_id" name="target_client_id" required>
+      {% for player in candidates %}
+      <option value="{{ player.client_id }}">
+        {{ player.name }}{% if player.seat %} (miejsce {{ player.seat }}){% endif %}{% if player.executed %} - wyeliminowany{% endif %}
+      </option>
+      {% endfor %}
+    </select>
+
+    <button type="submit">Zapisz zatrucie</button>
+  </form>
+  {% endif %}
+
+  <form method="get" action="{{ url_for('player_page') }}">
+    <button type="submit">Wróć do strony gracza</button>
+  </form>
+</div>
+{% endblock %}

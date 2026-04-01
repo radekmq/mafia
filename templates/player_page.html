@@ -133,23 +133,7 @@
   </table>
 
   <div id="executionControls" style="margin-top: 20px;">
-    <p id="voteError" style="color: red; font-weight: bold;"></p>
-    <p id="voteInfo" style="font-weight: bold;"></p>
-
     <button id="nominateBtn" type="button" style="display: none;">Nominuj do wyeliminowania</button>
-
-    <div id="nominationPanel" style="display: none; margin-top: 12px;">
-      <label for="nomineeSelect">Wybierz gracza do nominacji:</label>
-      <select id="nomineeSelect"></select>
-      <button id="confirmNominationBtn" type="button">Rozpocznij głosowanie</button>
-      <button id="cancelNominationBtn" type="button">Anuluj</button>
-    </div>
-
-    <div id="votePanel" style="display: none; margin-top: 12px;">
-      <p id="voteQuestion" style="text-align: center; font-weight: bold;"></p>
-      <button id="voteYesBtn" type="button">TAK</button>
-      <button id="voteNoBtn" type="button">NIE</button>
-    </div>
   </div>
 
   {% if is_jasnowidz %}
@@ -180,19 +164,12 @@
 
   {% if is_truciciel %}
   <div id="trucicielControls" style="margin-top: 20px;">
-    <p><strong>Dzień {{ day_number }}</strong></p>
-    <p id="trucicielError" style="color: red; font-weight: bold;"></p>
-    <p id="trucicielInfo" style="font-weight: bold;"></p>
+    {% if truciciel_used_today %}
+    <p style="font-weight: bold; text-align: center;">Dzisiejsze zatrucie Truciciela zostało już wykorzystane.</p>
+    {% endif %}
 
-    <label for="trucicielTarget">Wybierz gracza do zatrucia (aktywnie od kolejnego dnia):</label>
-    <select id="trucicielTarget">
-      {% for player in night_players %}
-      <option value="{{ player.client_id }}">{{ player.name }}{% if player.seat %} (miejsce {{ player.seat }}){% endif %}</option>
-      {% endfor %}
-    </select>
-
-    <button id="trucicielPoisonBtn" type="button" {% if truciciel_used_today or is_executed %}disabled{% endif %}>
-      Zatruj od kolejnego dnia
+    <button id="trucicielOpenBtn" type="button" {% if truciciel_used_today or is_executed %}disabled{% endif %}>
+      Zatruj postać
     </button>
   </div>
   {% endif %}
@@ -200,24 +177,12 @@
 
 <script id="playerStateData" type="application/json">{{ {"clientId": client_id, "executed": is_executed, "voteDead": vote_dead} | tojson }}</script>
 <script id="jasnowidzStateData" type="application/json">{{ {"isJasnowidz": is_jasnowidz, "usedToday": jasnowidz_used_today} | tojson }}</script>
-<script id="trucicielStateData" type="application/json">{{ {"isTruciciel": is_truciciel, "usedToday": truciciel_used_today} | tojson }}</script>
 
 <script>
   const playerState = JSON.parse(document.getElementById("playerStateData").textContent);
   const jasnowidzState = JSON.parse(document.getElementById("jasnowidzStateData").textContent);
-  const trucicielState = JSON.parse(document.getElementById("trucicielStateData").textContent);
 
   const nominateBtn = document.getElementById("nominateBtn");
-  const nominationPanel = document.getElementById("nominationPanel");
-  const nomineeSelect = document.getElementById("nomineeSelect");
-  const confirmNominationBtn = document.getElementById("confirmNominationBtn");
-  const cancelNominationBtn = document.getElementById("cancelNominationBtn");
-  const votePanel = document.getElementById("votePanel");
-  const voteQuestion = document.getElementById("voteQuestion");
-  const voteYesBtn = document.getElementById("voteYesBtn");
-  const voteNoBtn = document.getElementById("voteNoBtn");
-  const voteError = document.getElementById("voteError");
-  const voteInfo = document.getElementById("voteInfo");
 
   const jasnowidzError = document.getElementById("jasnowidzError");
   const jasnowidzInfo = document.getElementById("jasnowidzInfo");
@@ -225,16 +190,7 @@
   const jasnowidzFirstTarget = document.getElementById("jasnowidzFirstTarget");
   const jasnowidzSecondTarget = document.getElementById("jasnowidzSecondTarget");
 
-  const trucicielError = document.getElementById("trucicielError");
-  const trucicielInfo = document.getElementById("trucicielInfo");
-  const trucicielPoisonBtn = document.getElementById("trucicielPoisonBtn");
-  const trucicielTarget = document.getElementById("trucicielTarget");
-
-  let hasSubmittedVote = false;
-  let awaitingNominationCandidates = false;
-  let nominationRequestTimeoutId = null;
-  const isTouchDevice = (window.matchMedia && window.matchMedia("(pointer: coarse)").matches)
-    || (typeof navigator !== "undefined" && navigator.maxTouchPoints > 0);
+  const trucicielOpenBtn = document.getElementById("trucicielOpenBtn");
 
   function refreshPlayerPage() {
     window.location.href = `/player_page?t=${Date.now()}`;
@@ -250,121 +206,6 @@
 
   function renderNominationControls() {
     nominateBtn.style.display = canNominate() ? "block" : "none";
-    if (!canNominate()) {
-      nominationPanel.style.display = "none";
-    }
-  }
-
-  function setVotingButtonsDisabled(disabled) {
-    voteYesBtn.disabled = disabled;
-    voteNoBtn.disabled = disabled;
-  }
-
-  function submitExecutionVote(vote, label) {
-    voteError.textContent = "";
-    hasSubmittedVote = true;
-    setVotingButtonsDisabled(true);
-    votePanel.style.display = "none";
-    voteInfo.textContent = `Oddano głos: ${label}. Czekaj na zakończenie głosowania.`;
-    socket.emit("cast_execution_vote", { clientId: playerState.clientId, vote });
-  }
-
-  function renderNominationCandidates(data) {
-    voteError.textContent = "";
-
-    if (data.error) {
-      voteError.textContent = data.error;
-      nominationPanel.style.display = "none";
-      voteInfo.textContent = "";
-      return;
-    }
-
-    nomineeSelect.innerHTML = "";
-    const candidates = Array.isArray(data.players) ? data.players : [];
-
-    candidates.forEach(player => {
-      const option = document.createElement("option");
-      const seatLabel = player.seat ? ` (miejsce ${player.seat})` : "";
-      option.value = player.client_id;
-      option.textContent = `${player.name}${seatLabel}`;
-      nomineeSelect.appendChild(option);
-    });
-
-    nominationPanel.style.display = candidates.length ? "block" : "none";
-    voteInfo.textContent = "";
-    if (!candidates.length) {
-      voteError.textContent = "Brak dostępnych graczy do nominacji.";
-    }
-  }
-
-  async function fetchNominationCandidatesFallback() {
-    const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 4000);
-
-    try {
-      const response = await fetch(`/nomination-candidates?client_id=${encodeURIComponent(playerState.clientId)}`, {
-        method: "GET",
-        cache: "no-store",
-        credentials: "same-origin",
-        signal: controller.signal,
-      });
-      const data = await response.json();
-      renderNominationCandidates(data || {});
-    } catch (err) {
-      voteError.textContent = "Nie udało się pobrać listy kandydatów. Spróbuj ponownie.";
-      voteInfo.textContent = "";
-      nominationPanel.style.display = "none";
-    } finally {
-      clearTimeout(timeoutId);
-    }
-  }
-
-  function applyExecutionVoteStart(data) {
-    nominationPanel.style.display = "none";
-    voteError.textContent = "";
-
-    voteQuestion.textContent = `Czy chcesz wyeliminować gracza: ${data.nominee_name} z gry?`;
-    hasSubmittedVote = false;
-
-    const allowedToVote = data.can_vote === true && canVote();
-    votePanel.style.display = allowedToVote ? "block" : "none";
-
-    if (allowedToVote) {
-      voteInfo.textContent = "Oddaj głos: TAK lub NIE.";
-      setVotingButtonsDisabled(false);
-    } else {
-      voteInfo.textContent = "Trwa głosowanie. Nie musisz oddawać głosu.";
-    }
-  }
-
-  async function startExecutionVoteFallback(nomineeClientId) {
-    const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 4000);
-
-    try {
-      const response = await fetch("/start-execution-vote", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        credentials: "same-origin",
-        signal: controller.signal,
-        body: JSON.stringify({
-          client_id: playerState.clientId,
-          nominee_client_id: nomineeClientId,
-        }),
-      });
-
-      const data = await response.json();
-      if (!response.ok || data.error) {
-        voteError.textContent = (data && data.error) || "Nie udało się rozpocząć głosowania.";
-        return;
-      }
-
-      applyExecutionVoteStart(data);
-    } catch (err) {
-      voteError.textContent = "Błąd połączenia. Nie udało się rozpocząć głosowania.";
-    } finally {
-      clearTimeout(timeoutId);
-    }
   }
 
   function bindTap(element, handler) {
@@ -453,113 +294,14 @@
     });
   }
 
-  if (trucicielState.isTruciciel && trucicielPoisonBtn) {
-    if (trucicielState.usedToday && trucicielInfo) {
-      trucicielInfo.textContent = "Dzisiejsze zatrucie Truciciela zostało już wykorzystane.";
-    }
-
-    bindTap(trucicielPoisonBtn, () => {
-      const targetClientId = trucicielTarget.value;
-      if (!targetClientId) {
-        if (trucicielError) {
-          trucicielError.textContent = "Wybierz gracza do zatrucia.";
-        }
-        return;
-      }
-
-      if (trucicielError) {
-        trucicielError.textContent = "";
-      }
-      if (trucicielInfo) {
-        trucicielInfo.textContent = "Wysyłanie akcji...";
-      }
-
-      socket.emit("truciciel_day_action", {
-        clientId: playerState.clientId,
-        target_client_id: targetClientId,
-      });
+  if (trucicielOpenBtn) {
+    bindTap(trucicielOpenBtn, () => {
+      window.location.href = "/truciciel-akcja";
     });
   }
 
   bindTap(nominateBtn, () => {
     window.location.href = "/nomination";
-  });
-
-  bindTap(cancelNominationBtn, () => {
-    nominationPanel.style.display = "none";
-  });
-
-  bindTap(confirmNominationBtn, () => {
-    voteError.textContent = "";
-    const nomineeClientId = nomineeSelect.value;
-
-    if (!nomineeClientId) {
-      voteError.textContent = "Wybierz gracza do nominacji.";
-      return;
-    }
-
-    if (isTouchDevice) {
-      voteInfo.textContent = "Rozpoczynanie głosowania...";
-      startExecutionVoteFallback(nomineeClientId);
-      return;
-    }
-
-    socket.emit("start_execution_vote", {
-      clientId: playerState.clientId,
-      nominee_client_id: nomineeClientId
-    });
-  });
-
-  bindTap(voteYesBtn, () => {
-    submitExecutionVote("yes", "TAK");
-  });
-
-  bindTap(voteNoBtn, () => {
-    submitExecutionVote("no", "NIE");
-  });
-
-  socket.on("nomination_candidates", data => {
-    awaitingNominationCandidates = false;
-    if (nominationRequestTimeoutId) {
-      clearTimeout(nominationRequestTimeoutId);
-      nominationRequestTimeoutId = null;
-    }
-
-    renderNominationCandidates(data || {});
-  });
-
-  socket.on("execution_vote_started", data => {
-    applyExecutionVoteStart(data);
-  });
-
-  socket.on("execution_vote_error", data => {
-    voteError.textContent = data.error || "Wystąpił błąd głosowania.";
-
-    if (hasSubmittedVote) {
-      voteInfo.textContent = "Nie udało się zapisać Twojego głosu. Spróbuj ponownie.";
-      votePanel.style.display = canVote() ? "block" : "none";
-    }
-
-    setVotingButtonsDisabled(false);
-    hasSubmittedVote = false;
-  });
-
-  socket.on("execution_vote_result", data => {
-    votePanel.style.display = "none";
-    nominationPanel.style.display = "none";
-    voteError.textContent = "";
-
-    const summary = `${data.message} Wynik głosowania: TAK=${data.yes_votes}, NIE=${data.no_votes}.`;
-    voteInfo.textContent = summary;
-
-    if (data.player_flags) {
-      playerState.executed = !!data.player_flags.executed;
-      playerState.voteDead = !!data.player_flags.vote_dead;
-      renderNominationControls();
-    }
-
-    setVotingButtonsDisabled(false);
-    hasSubmittedVote = false;
   });
 
   socket.on("jasnowidz_action_error", data => {
@@ -580,30 +322,6 @@
     jasnowidzInfo.textContent = data.message || "Akcja Jasnowidza wykonana.";
     if (jasnowidzAskBtn) {
       jasnowidzAskBtn.disabled = true;
-    }
-    refreshPlayerPage();
-  });
-
-  socket.on("truciciel_action_error", data => {
-    if (!trucicielState.isTruciciel || !trucicielError) {
-      return;
-    }
-    trucicielError.textContent = data.error || "Nie udało się wykonać akcji Truciciela.";
-    if (trucicielInfo) {
-      trucicielInfo.textContent = "";
-    }
-  });
-
-  socket.on("truciciel_action_result", data => {
-    if (!trucicielState.isTruciciel || !trucicielInfo) {
-      return;
-    }
-    if (trucicielError) {
-      trucicielError.textContent = "";
-    }
-    trucicielInfo.textContent = data.message || "Akcja Truciciela wykonana.";
-    if (trucicielPoisonBtn) {
-      trucicielPoisonBtn.disabled = true;
     }
     refreshPlayerPage();
   });
@@ -667,6 +385,11 @@
       }
 
       const data = await response.json();
+      if (data.execution_vote_active) {
+        window.location.href = `/execution-vote?t=${Date.now()}&client_id=${encodeURIComponent(window.clientId || "")}`;
+        return;
+      }
+
       if ((data.mode === "day" || data.mode === "night") && data.mode !== modeState.mode) {
         redirectForModeChange();
       }

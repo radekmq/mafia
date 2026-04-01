@@ -1,7 +1,7 @@
 import random
 import copy
 
-test_enabled = False
+test_enabled = True
 
 class Database:
     def __init__(self):
@@ -776,7 +776,7 @@ def fun_truciciel(characters, players, drunk=False, poisoned=False, mode="day", 
     else:
         status_lines.append(f"Aktywne zatrucie (dzień {day_number}): brak.")
 
-    return " ".join(status_lines)
+    return "\n".join(status_lines)
 
 def fun_szpieg(characters, players, drunk=False, poisoned=False):
     return "Na razie nic."

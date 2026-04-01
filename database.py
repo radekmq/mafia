@@ -115,7 +115,7 @@ db_characters = {
             "file": "imp.png", 
             "route": "imp", 
             "player_status": fun_imp, 
-            "player_info": "TBD"
+            "player_info": "Każdej nocy, wybierz gracza: ten gracz umiera. Jeśli w ten sposób zabijesz samego siebie, jeden z Minionów staje się Impem. Imp zabija jednego gracza każdej nocy i może „stworzyć kopię samego siebie”… za straszną cenę."
         },
     ]
 }

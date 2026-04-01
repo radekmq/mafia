@@ -221,40 +221,93 @@
 
     const socketUrl = window.location.origin;
 
-    // Lacz sie z tym samym adresem, z ktorego zostala otwarta aplikacja.
-    const socket = io(socketUrl, {
-      transports: ["websocket", "polling"]
-    });
-    window.socket = socket;
-
-    socket.on("connect", () => {
-      console.log("Połączono z serwerem:", socket.id);
-      // możesz od razu wysłać client_id, zamiast czekać na prośbę
-      socket.emit("client_id_response", { client_id: clientId });
-    });
-
-    socket.on("redirect_user", data => {
-      window.location.href = data.url;
-    });
-
-    socket.on("redirect_user_for_clients", data => {
-      const targetClientIds = data && Array.isArray(data.target_client_ids)
-        ? data.target_client_ids
-        : [];
-
-      if (window.clientId && targetClientIds.includes(window.clientId)) {
-        window.location.href = data.url;
+    function withClientId(url) {
+      if (!window.clientId) {
+        return url;
       }
-    });
 
-    socket.on("disconnect", () => {
-      console.warn("Rozłączono z serwerem");
-    });
+      const separator = url.includes("?") ? "&" : "?";
+      return `${url}${separator}client_id=${encodeURIComponent(window.clientId)}`;
+    }
 
-    socket.on("game_over", data => {
-      const message = (data && data.message) ? data.message : "Koniec gry.";
-      alert(message);
-    });
+    let socket = null;
+    if (typeof io === "function") {
+      // Lacz sie z tym samym adresem, z ktorego zostala otwarta aplikacja.
+      socket = io(socketUrl, {
+        transports: ["websocket", "polling"]
+      });
+      window.socket = socket;
+
+      socket.on("connect", () => {
+        console.log("Połączono z serwerem:", socket.id);
+        socket.emit("client_id_response", { client_id: clientId });
+      });
+
+      socket.on("redirect_user", data => {
+        window.location.href = withClientId(data.url);
+      });
+
+      socket.on("redirect_user_for_clients", data => {
+        const targetClientIds = data && Array.isArray(data.target_client_ids)
+          ? data.target_client_ids
+          : [];
+
+        if (window.clientId && targetClientIds.includes(window.clientId)) {
+          window.location.href = withClientId(data.url);
+        }
+      });
+
+      socket.on("disconnect", () => {
+        console.warn("Rozłączono z serwerem");
+      });
+
+      socket.on("game_over", data => {
+        const message = (data && data.message) ? data.message : "Koniec gry.";
+        alert(message);
+      });
+    } else {
+      console.warn("socket.io nie jest dostępny - przejście na fallback HTTP");
+      window.socket = null;
+    }
+
+    const executionVoteFallbackPaths = [
+      "/player_page",
+      "/nomination",
+      "/truciciel-akcja",
+      "/wiki",
+    ];
+
+    async function checkExecutionVoteFallback() {
+      try {
+        const response = await fetch(`/game-status?t=${Date.now()}`, {
+          method: "GET",
+          cache: "no-store",
+        });
+
+        if (!response.ok) {
+          return;
+        }
+
+        const data = await response.json();
+        const currentPath = window.location.pathname || "";
+        const onSupportedPage = executionVoteFallbackPaths.some(path => currentPath.startsWith(path));
+
+        if (data && data.is_player && data.execution_vote_active && onSupportedPage && !currentPath.startsWith("/execution-vote")) {
+          window.location.href = withClientId(`/execution-vote?t=${Date.now()}`);
+        }
+      } catch (err) {
+        console.warn("Fallback execution vote check failed:", err);
+      }
+    }
+
+    checkExecutionVoteFallback();
+    setInterval(checkExecutionVoteFallback, 1200);
+
+    if (socket) {
+      socket.on("connect", () => {
+        checkExecutionVoteFallback();
+      });
+    }
   </script>
 </head>
 <body>

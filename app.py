@@ -7,6 +7,7 @@ import random
 import inspect
 
 from database import db_characters, trouble_brewing_setup
+import time
 
 app = Flask(__name__)
 app.secret_key = "tajny_klucz"
@@ -40,12 +41,14 @@ DEFAULT_TEST_PLAYERS = [
 
 execution_vote_state = {
     "active": False,
+    "vote_id": 0,
     "nominator_client_id": None,
     "nominee_client_id": None,
     "nominee_name": None,
     "votes": {},
     "required_voters": [],
     "optional_voters": [],
+    "last_result": None,
 }
 
 ALLOWED_BACK_ENDPOINTS = {"lobby", "handle_menu", "index", "player_page"}
@@ -114,6 +117,137 @@ def build_nomination_candidates_payload(client_id):
     return {"players": candidates}
 
 
+def get_sorted_player_options():
+    players = []
+    for listed_client_id, player in sorted(
+        db_players.get_all().items(),
+        key=lambda item: item[1].get("seat") or 9999,
+    ):
+        ensure_player_flags(player)
+        players.append(
+            {
+                "client_id": listed_client_id,
+                "name": player.get("name", "Nieznany"),
+                "seat": player.get("seat"),
+                "executed": player.get("executed", False),
+            }
+        )
+    return players
+
+
+def redirect_players_to_endpoint(endpoint_name, target_client_ids=None, **values):
+    target_client_ids = list(target_client_ids or db_players.get_all_client_ids())
+    target_url = url_for(endpoint_name, **values)
+
+    for client_id in target_client_ids:
+        if client_id not in db_players:
+            continue
+
+        player = db_players[client_id]
+
+        sid = player.get("sid")
+        if not sid:
+            continue
+
+        socketio.emit("redirect_user", {"url": target_url}, to=sid)
+
+    socketio.emit(
+        "redirect_user_for_clients",
+        {"url": target_url, "target_client_ids": target_client_ids},
+    )
+
+
+def build_execution_vote_page_context(client_id):
+    if not execution_vote_state["active"]:
+        return None
+
+    ensure_player_flags(db_players[client_id])
+
+    required_voters = set(execution_vote_state["required_voters"])
+    optional_voters = set(execution_vote_state["optional_voters"])
+    current_votes = execution_vote_state["votes"]
+
+    return {
+        "vote_id": execution_vote_state.get("vote_id", 0),
+        "nominee_name": execution_vote_state["nominee_name"],
+        "nominee_client_id": execution_vote_state["nominee_client_id"],
+        "can_vote": (
+            client_id in required_voters or client_id in optional_voters
+        ) and client_id not in current_votes,
+        "has_voted": client_id in current_votes,
+        "required_votes_cast": sum(1 for voter in current_votes if voter in required_voters),
+        "required_votes_total": len(required_voters),
+        "yes_votes": sum(1 for vote in current_votes.values() if vote == "yes"),
+        "no_votes": sum(1 for vote in current_votes.values() if vote == "no"),
+    }
+
+
+def build_execution_vote_public_status():
+    if not execution_vote_state["active"]:
+        return {
+            "active": False,
+            "last_result": execution_vote_state.get("last_result"),
+            "server_ts": int(time.time() * 1000),
+        }
+
+    required_voters = set(execution_vote_state["required_voters"])
+    current_votes = execution_vote_state["votes"]
+
+    return {
+        "active": True,
+        "vote_id": execution_vote_state.get("vote_id", 0),
+        "nominee_name": execution_vote_state.get("nominee_name"),
+        "required_votes_cast": sum(1 for voter in current_votes if voter in required_voters),
+        "required_votes_total": len(required_voters),
+        "yes_votes": sum(1 for vote in current_votes.values() if vote == "yes"),
+        "no_votes": sum(1 for vote in current_votes.values() if vote == "no"),
+        "server_ts": int(time.time() * 1000),
+    }
+
+
+def log_assigned_characters_summary(game_selection):
+    if not game_selection:
+        print("[character-summary] Brak danych do podsumowania.")
+        return
+
+    print("\n[character-summary] Przydzial postaci:")
+    print("[character-summary]" + "-" * 88)
+    print("[character-summary] {:<14} | {:<20} | {:<24} | {:<5}".format("Kategoria", "Postac", "Gracz", "Seat"))
+    print("[character-summary]" + "-" * 88)
+
+    used_client_ids = set()
+
+    for category in ["Mieszkańcy", "Outsiderzy", "Minionki", "Demon"]:
+        for char in game_selection.get(category, []):
+            client_id = char.get("client_id")
+
+            has_real_assignment = (
+                bool(client_id)
+                and client_id in db_players
+                and client_id not in used_client_ids
+            )
+
+            if has_real_assignment:
+                player_name = db_players[client_id].get("name", "Nieznany")
+                player_label = f"{player_name} ({client_id})"
+                seat = db_players[client_id].get("seat", "brak")
+                used_client_ids.add(client_id)
+            else:
+                player_label = "brak"
+                seat = "brak"
+
+            print(
+                "[character-summary] {:<14} | {:<20} | {:<24} | {:<5}".format(
+                    category,
+                    char.get("name", "Nieznana"),
+                    player_label,
+                    seat,
+                )
+            )
+
+    print("[character-summary]" + "-" * 88)
+
+
 def is_seat_taken(seat, excluded_client_id=None):
     for existing_client_id, player in db_players.get_all().items():
         if existing_client_id == excluded_client_id:
@@ -133,6 +267,7 @@ def build_game_status_payload():
         "mode": db_game["mode"],
         "day_number": db_game.get("day_number", 1),
         "winner": db_game.get("winner"),
+        "execution_vote_active": execution_vote_state["active"],
     }
 
 
@@ -240,6 +375,7 @@ def emit_execution_vote_result(message, yes_votes, no_votes, executed):
         socketio.emit(
             "execution_vote_result",
             {
+                "vote_id": execution_vote_state.get("vote_id", 0),
                 "message": message,
                 "yes_votes": yes_votes,
                 "no_votes": no_votes,
@@ -251,6 +387,120 @@ def emit_execution_vote_result(message, yes_votes, no_votes, executed):
             },
             to=sid,
         )
+
+
+def emit_execution_vote_progress():
+    if not execution_vote_state["active"]:
+        return
+
+    required_voters = set(execution_vote_state["required_voters"])
+    optional_voters = set(execution_vote_state["optional_voters"])
+    current_votes = execution_vote_state["votes"]
+
+    required_votes_cast = sum(1 for voter in current_votes if voter in required_voters)
+    yes_votes = sum(1 for vote in current_votes.values() if vote == "yes")
+    no_votes = sum(1 for vote in current_votes.values() if vote == "no")
+
+    for client_id in db_players.get_all_client_ids():
+        player = db_players[client_id]
+        sid = player.get("sid")
+        if not sid:
+            continue
+
+        can_vote = (
+            client_id in required_voters or client_id in optional_voters
+        ) and client_id not in current_votes
+
+        socketio.emit(
+            "execution_vote_progress",
+            {
+                "vote_id": execution_vote_state.get("vote_id", 0),
+                "required_votes_cast": required_votes_cast,
+                "required_votes_total": len(required_voters),
+                "yes_votes": yes_votes,
+                "no_votes": no_votes,
+                "can_vote": can_vote,
+                "has_voted": client_id in current_votes,
+            },
+            to=sid,
+        )
+
+
+def submit_execution_vote(voter_client_id, raw_vote):
+    normalized_vote = str(raw_vote or "").strip().lower()
+
+    if normalized_vote in {"tak", "yes", "true", "1"}:
+        vote = "yes"
+    elif normalized_vote in {"nie", "no", "false", "0"}:
+        vote = "no"
+    else:
+        return "Niepoprawny głos. Użyj TAK lub NIE."
+
+    if not execution_vote_state["active"]:
+        return "Aktualnie nie trwa żadne głosowanie."
+
+    if not voter_client_id or voter_client_id not in db_players:
+        return "Nie znaleziono gracza głosującego."
+
+    if voter_client_id in execution_vote_state["votes"]:
+        return "Ten gracz już oddał głos."
+
+    required_voters = set(execution_vote_state["required_voters"])
+    optional_voters = set(execution_vote_state["optional_voters"])
+
+    if voter_client_id not in required_voters and voter_client_id not in optional_voters:
+        return "Ten gracz nie może oddać głosu w tym głosowaniu."
+
+    ensure_player_flags(db_players[voter_client_id])
+    if voter_client_id in optional_voters:
+        db_players[voter_client_id]["vote_dead"] = False
+
+    execution_vote_state["votes"][voter_client_id] = vote
+    emit_execution_vote_progress()
+    finalize_execution_vote_if_ready()
+    return None
+
+
+def perform_truciciel_day_action(actor_client_id, target_client_id):
+    if not db_game_selection:
+        return "Brak aktywnej rozgrywki.", None
+
+    if db_game.get("mode") != "day":
+        return "Akcja Truciciela jest dostępna tylko w dzień.", None
+
+    if not actor_client_id or actor_client_id not in db_players:
+        return "Nie znaleziono gracza wykonującego akcję.", None
+
+    if not target_client_id or target_client_id not in db_players:
+        return "Nie znaleziono wybranego celu.", None
+
+    ensure_player_flags(db_players[actor_client_id])
+    if db_players[actor_client_id]["executed"]:
+        return "Wyeliminowany Truciciel nie może wykonać akcji.", None
+
+    real_character, _ = get_player_character_views(actor_client_id)
+    if not real_character or real_character.get("name") != "Truciciel":
+        return "Tylko Truciciel może wykonać tę akcję.", None
+
+    day_number = db_game.get("day_number", 1)
+    if real_character.get("truciciel_last_day_used") == day_number:
+        return "Dzisiaj wykorzystałeś już zatrucie.", None
+
+    poison_targets_by_day = real_character.setdefault("truciciel_poison_targets_by_day", {})
+    next_day = day_number + 1
+    poison_targets_by_day[str(next_day)] = target_client_id
+
+    real_character["truciciel_last_day_used"] = day_number
+    real_character["truciciel_last_selected_target_client_id"] = target_client_id
+    real_character.pop("resolved_player_status", None)
+    real_character.pop("resolved_player_status_key", None)
+
+    target_name = db_players[target_client_id].get("name", "Nieznany")
+    result_message = (
+        f"Wybrałeś cel zatrucia: {target_name}. "
+        f"Efekt zatrucia będzie aktywny od dnia {next_day}."
+    )
+    return None, result_message
 
 
 def finalize_execution_vote_if_ready(force=False):
@@ -280,6 +530,16 @@ def finalize_execution_vote_if_ready(force=False):
     else:
         message = f"Gracz {nominee_name} nie został wyeliminowany (większość NIE lub remis)."
 
+    execution_vote_state["last_result"] = {
+        "vote_id": execution_vote_state.get("vote_id", 0),
+        "nominee_name": nominee_name,
+        "message": message,
+        "yes_votes": yes_votes,
+        "no_votes": no_votes,
+        "executed": player_executed,
+        "required_votes_total": len(required_voters),
+    }
+
     emit_execution_vote_result(message, yes_votes, no_votes, player_executed)
     reset_execution_vote_state()
 
@@ -303,6 +563,8 @@ def try_start_execution_vote(nominator_client_id, nominee_client_id):
         return "Nie można nominować gracza już wyeliminowanego."
 
     execution_vote_state["active"] = True
+    execution_vote_state["vote_id"] = execution_vote_state.get("vote_id", 0) + 1
+    execution_vote_state["last_result"] = None
     execution_vote_state["nominator_client_id"] = nominator_client_id
     execution_vote_state["nominee_client_id"] = nominee_client_id
     execution_vote_state["nominee_name"] = db_players[nominee_client_id].get("name", "Nieznany")
@@ -311,6 +573,8 @@ def try_start_execution_vote(nominator_client_id, nominee_client_id):
     execution_vote_state["optional_voters"] = get_optional_dead_voter_ids()
 
     emit_execution_vote_started()
+    emit_execution_vote_progress()
+    redirect_players_to_endpoint("execution_vote_page")
     return None
     if player_executed:
         check_and_announce_evil_win_if_needed()
@@ -474,41 +738,9 @@ def handle_start_execution_vote(data):
 @socketio.on("cast_execution_vote")
 def handle_cast_execution_vote(data):
     voter_client_id = data.get("clientId") or data.get("client_id")
-    raw_vote = str(data.get("vote", "")).strip().lower()
-
-    if raw_vote in {"tak", "yes", "true", "1"}:
-        vote = "yes"
-    elif raw_vote in {"nie", "no", "false", "0"}:
-        vote = "no"
-    else:
-        emit("execution_vote_error", {"error": "Niepoprawny głos. Użyj TAK lub NIE."})
-        return
-
-    if not execution_vote_state["active"]:
-        emit("execution_vote_error", {"error": "Aktualnie nie trwa żadne głosowanie."})
-        return
-
-    if not voter_client_id or voter_client_id not in db_players:
-        emit("execution_vote_error", {"error": "Nie znaleziono gracza głosującego."})
-        return
-
-    if voter_client_id in execution_vote_state["votes"]:
-        emit("execution_vote_error", {"error": "Ten gracz już oddał głos."})
-        return
-
-    required_voters = set(execution_vote_state["required_voters"])
-    optional_voters = set(execution_vote_state["optional_voters"])
-
-    if voter_client_id not in required_voters and voter_client_id not in optional_voters:
-        emit("execution_vote_error", {"error": "Ten gracz nie może oddać głosu w tym głosowaniu."})
-        return
-
-    ensure_player_flags(db_players[voter_client_id])
-    if voter_client_id in optional_voters:
-        db_players[voter_client_id]["vote_dead"] = False
-
-    execution_vote_state["votes"][voter_client_id] = vote
-    finalize_execution_vote_if_ready()
+    error = submit_execution_vote(voter_client_id, data.get("vote"))
+    if error:
+        emit("execution_vote_error", {"error": error})
 
 
 @socketio.on("imp_night_action")
@@ -664,51 +896,10 @@ def handle_truciciel_day_action(data):
     actor_client_id = data.get("clientId") or data.get("client_id")
     target_client_id = data.get("target_client_id")
 
-    if not db_game_selection:
-        emit("truciciel_action_error", {"error": "Brak aktywnej rozgrywki."})
+    error, result_message = perform_truciciel_day_action(actor_client_id, target_client_id)
+    if error:
+        emit("truciciel_action_error", {"error": error})
         return
-
-    if db_game.get("mode") != "day":
-        emit("truciciel_action_error", {"error": "Akcja Truciciela jest dostępna tylko w dzień."})
-        return
-
-    if not actor_client_id or actor_client_id not in db_players:
-        emit("truciciel_action_error", {"error": "Nie znaleziono gracza wykonującego akcję."})
-        return
-
-    if not target_client_id or target_client_id not in db_players:
-        emit("truciciel_action_error", {"error": "Nie znaleziono wybranego celu."})
-        return
-
-    ensure_player_flags(db_players[actor_client_id])
-    if db_players[actor_client_id]["executed"]:
-        emit("truciciel_action_error", {"error": "Wyeliminowany Truciciel nie może wykonać akcji."})
-        return
-
-    real_character, _ = get_player_character_views(actor_client_id)
-    if not real_character or real_character.get("name") != "Truciciel":
-        emit("truciciel_action_error", {"error": "Tylko Truciciel może wykonać tę akcję."})
-        return
-
-    day_number = db_game.get("day_number", 1)
-    if real_character.get("truciciel_last_day_used") == day_number:
-        emit("truciciel_action_error", {"error": "Dzisiaj wykorzystałeś już zatrucie."})
-        return
-
-    poison_targets_by_day = real_character.setdefault("truciciel_poison_targets_by_day", {})
-    next_day = day_number + 1
-    poison_targets_by_day[str(next_day)] = target_client_id
-
-    real_character["truciciel_last_day_used"] = day_number
-    real_character["truciciel_last_selected_target_client_id"] = target_client_id
-    real_character.pop("resolved_player_status", None)
-    real_character.pop("resolved_player_status_key", None)
-
-    target_name = db_players[target_client_id].get("name", "Nieznany")
-    result_message = (
-        f"Wybrałeś cel zatrucia: {target_name}. "
-        f"Efekt zatrucia będzie aktywny od dnia {next_day}."
-    )
 
     emit("truciciel_action_result", {"message": result_message})
     emit("force_player_page_refresh", {})
@@ -846,15 +1037,44 @@ def game_status():
     client_id = session.get("client_id")
     is_player = bool(client_id and client_id in db_players)
 
-    return jsonify({
+    response = jsonify({
         "no_of_players": len(db_players),
         "game_active": db_game["game_active"],
         "char_presented": db_game["char_presented"],
         "mode": db_game["mode"],
         "day_number": db_game.get("day_number", 1),
         "winner": db_game.get("winner"),
+        "execution_vote_active": execution_vote_state["active"],
         "is_player": is_player,
-    }), 200
+        "server_ts": int(time.time() * 1000),
+    })
+    response.headers["Cache-Control"] = "no-store, no-cache, must-revalidate, max-age=0"
+    response.headers["Pragma"] = "no-cache"
+    response.headers["Expires"] = "0"
+    return response, 200
+
+
+@app.route("/execution-vote-status", methods=["GET"])
+def execution_vote_status():
+    session_client_id = session.get("client_id")
+    client_id = session_client_id or request.args.get("client_id")
+    if not client_id or client_id not in db_players:
+        return jsonify({"error": "Brak aktywnej sesji gracza."}), 401
+
+    vote_context = build_execution_vote_page_context(client_id)
+    if not vote_context:
+        return jsonify({"active": False, "last_result": execution_vote_state.get("last_result")}), 200
+
+    return jsonify({"active": True, "vote_context": vote_context}), 200
+
+
+@app.route("/execution-vote-public-status", methods=["GET"])
+def execution_vote_public_status():
+    response = jsonify(build_execution_vote_public_status())
+    response.headers["Cache-Control"] = "no-store, no-cache, must-revalidate, max-age=0"
+    response.headers["Pragma"] = "no-cache"
+    response.headers["Expires"] = "0"
+    return response, 200
 
 
 @app.route("/nomination-candidates", methods=["GET"])
@@ -984,6 +1204,7 @@ def create():
                 db_characters,
                 db_players.get_all(),
             )
+            log_assigned_characters_summary(db_game_selection)
             redirect_players_to_character_pages()
             
         return jsonify({"error": "ok"}), 200
@@ -1166,27 +1387,14 @@ def get_stable_player_status(character):
 
 
 def redirect_players_to_character_pages():
-    player_page_url = url_for("player_page")
     target_client_ids = db_players.get_all_client_ids()
 
     for client_id in target_client_ids:
         player = db_players[client_id]
         print(f"[redirect_players_to_character_pages] Przetwarzam client_id={client_id}, player={player}")
         print(f"[redirect_players_to_character_pages] player.name={player.get('name')}, player.character={player.get('character')}, player.sid={player.get('sid')}")
-        sid = player.get("sid")
 
-        if not sid:
-            print(f"[redirect_players_to_character_pages] Pomijam client_id={client_id}, brak aktywnego sid")
-            continue
-
-        socketio.emit("redirect_user", {"url": player_page_url}, to=sid)
-
-    # Fallback dla klientów mobilnych/przeglądarek, gdzie mapowanie client_id -> sid
-    # mogło nie zsynchronizować się na czas; klient sam sprawdza czy jego client_id jest na liście.
-    socketio.emit(
-        "redirect_user_for_clients",
-        {"url": player_page_url, "target_client_ids": target_client_ids},
-    )
+    redirect_players_to_endpoint("player_page", target_client_ids=target_client_ids)
 
 
 @app.route("/player_page")
@@ -1196,6 +1404,8 @@ def player_page():
         return redirect(url_for("index"))
     if not db_game_selection:
         return redirect(url_for("index"))
+    if execution_vote_state["active"]:
+        return redirect(url_for("execution_vote_page"))
     
     real_character, visible_character = get_player_character_views(client_id)
     if not visible_character:
@@ -1210,17 +1420,7 @@ def player_page():
     is_jasnowidz = bool(real_character and real_character.get("name") == "Jasnowidz")
     is_truciciel = bool(real_character and real_character.get("name") == "Truciciel")
 
-    night_players = []
-    for listed_client_id, player in sorted(db_players.get_all().items(), key=lambda item: item[1].get("seat") or 9999):
-        ensure_player_flags(player)
-        night_players.append(
-            {
-                "client_id": listed_client_id,
-                "name": player.get("name", "Nieznany"),
-                "seat": player.get("seat"),
-                "executed": player.get("executed", False),
-            }
-        )
+    night_players = get_sorted_player_options()
 
     jasnowidz_used_today = False
     if is_jasnowidz:
@@ -1272,6 +1472,8 @@ def nomination_page():
     ensure_player_flags(db_players[client_id])
     if db_game.get("mode") != "day":
         return redirect(url_for("player_page"))
+    if execution_vote_state["active"]:
+        return redirect(url_for("execution_vote_page"))
 
     error = ""
 
@@ -1279,7 +1481,7 @@ def nomination_page():
         nominee_client_id = (request.form.get("nominee_client_id") or "").strip()
         error = try_start_execution_vote(client_id, nominee_client_id) or ""
         if not error:
-            return redirect(url_for("player_page"))
+            return redirect(url_for("execution_vote_page"))
 
     payload = build_nomination_candidates_payload(client_id)
     if payload.get("error"):
@@ -1292,6 +1494,91 @@ def nomination_page():
         "nomination.html",
         candidates=candidates,
         error=error,
+    )
+
+
+@app.route("/execution-vote", methods=["GET", "POST"])
+def execution_vote_page():
+    session_client_id = session.get("client_id")
+    request_client_id = (
+        request.args.get("client_id")
+        or request.form.get("client_id")
+        or request.args.get("clientId")
+        or request.form.get("clientId")
+    )
+    client_id = session_client_id or request_client_id
+
+    if not client_id or client_id not in db_players:
+        return redirect(url_for("index"))
+
+    if session_client_id != client_id:
+        session["client_id"] = client_id
+
+    if not db_game_selection:
+        return redirect(url_for("player_page"))
+
+    ensure_player_flags(db_players[client_id])
+
+    if request.method == "POST":
+        error = submit_execution_vote(client_id, request.form.get("vote"))
+        if error:
+            return redirect(url_for("execution_vote_page", error=error, client_id=client_id))
+        return redirect(url_for("execution_vote_page", submitted="1", client_id=client_id))
+
+    vote_context = build_execution_vote_page_context(client_id)
+    if not vote_context:
+        return redirect(url_for("player_page"))
+
+    return render_template(
+        "execution_vote.html",
+        client_id=client_id,
+        vote_context=vote_context,
+        error=(request.args.get("error") or "").strip(),
+        submitted=request.args.get("submitted") == "1",
+    )
+
+
+@app.route("/truciciel-akcja", methods=["GET", "POST"])
+def truciciel_action_page():
+    client_id = session.get("client_id")
+    if not client_id or client_id not in db_players:
+        return redirect(url_for("index"))
+
+    if not db_game_selection:
+        return redirect(url_for("player_page"))
+
+    if execution_vote_state["active"]:
+        return redirect(url_for("execution_vote_page"))
+
+    ensure_player_flags(db_players[client_id])
+    real_character, visible_character = get_player_character_views(client_id)
+    if not real_character or real_character.get("name") != "Truciciel":
+        return redirect(url_for("player_page"))
+
+    if db_game.get("mode") != "day":
+        return redirect(url_for("player_page"))
+
+    error = ""
+
+    if request.method == "POST":
+        target_client_id = (request.form.get("target_client_id") or "").strip()
+        error, _ = perform_truciciel_day_action(client_id, target_client_id)
+        if not error:
+            socketio.emit("force_player_page_refresh", {})
+            return redirect(url_for("truciciel_action_page", saved="1"))
+
+    day_number = db_game.get("day_number", 1)
+    used_today = real_character.get("truciciel_last_day_used") == day_number
+
+    return render_template(
+        "truciciel_action.html",
+        day_number=day_number,
+        candidates=get_sorted_player_options(),
+        is_executed=db_players[client_id]["executed"],
+        used_today=used_today,
+        status_text=get_stable_player_status(visible_character),
+        error=error,
+        saved=request.args.get("saved") == "1",
     )
     
 def update_player(client_id):  

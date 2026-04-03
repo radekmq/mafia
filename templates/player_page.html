@@ -1,9 +1,32 @@
 {% extends "base.html" %}
 
-{% block title %}Blood on the clocktower – Strona główna{% endblock %}
+{% block title %}Blood on the clocktower - Strona gracza{% endblock %}
 
 {% block content %}
-<script id="modeStateData" type="application/json">{{ {"mode": current_mode} | tojson }}</script>
+<script id="playerHubState" type="application/json">{{ {"mode": current_mode, "clientId": client_id, "characterPagesVisible": character_pages_visible, "isAdmin": is_admin} | tojson }}</script>
+
+<div class="container" style="overflow-x:auto; margin-bottom: 16px;">
+  <h3 style="text-align: center; margin-top: 0;">Panel gracza</h3>
+
+  <table cellspacing="0" cellpadding="8">
+    <tr>
+      <td>Aktualny tryb:</td>
+      <td id="hubModeValue" style="text-align: center;">{{ "Dzień" if current_mode == "day" else "Noc" }}</td>
+    </tr>
+    <tr>
+      <td>Numer dnia:</td>
+      <td id="hubDayNumberValue" style="text-align: center;">{{ day_number }}</td>
+    </tr>
+    <tr>
+      <td>Status gracza:</td>
+      <td id="hubPlayerStatusValue" style="text-align: center;">{{ "Martwy" if is_executed else "Żywy" }}</td>
+    </tr>
+  </table>
+
+  <div style="margin-top: 14px; display: flex; justify-content: center;">
+    <button id="nominateBtn" type="button" {% if is_executed %}disabled{% endif %}>Nominuj gracza</button>
+  </div>
+</div>
 
 {% if is_admin %}
 <div class="container" id="adminCombinedPanel" style="margin-bottom: 16px;">
@@ -20,12 +43,16 @@
       <td><p id="adminPostacieWylosowane" style="text-align: center; margin: 0;">{{ "TAK" if char_presented else "NIE" }}</p></td>
     </tr>
     <tr>
-      <td>Aktualny tryb:</td>
-      <td><p id="adminAktualnyTryb" style="text-align: center; margin: 0;">{{ "Dzień" if current_mode == "day" else "Noc" }}</p></td>
+      <td>Strony postaci widoczne:</td>
+      <td><p id="adminCharacterPagesVisible" style="text-align: center; margin: 0;">{{ "TAK" if character_pages_visible else "NIE" }}</p></td>
     </tr>
-    <tr id="adminImpActionStatusRow" {% if current_mode != "night" %}style="display: none;"{% endif %}>
-      <td>Akcje nocne (Demon + Truciciel):</td>
-      <td><p id="adminImpActionStatus" style="text-align: center; margin: 0;">{{ "Jeszcze się zastanawia" if night_actions_pending else "Wykonana" }}</p></td>
+    <tr>
+      <td>Akcja Impa wykonana:</td>
+      <td><p id="adminImpDone" style="text-align: center; margin: 0;">{{ "TAK" if imp_action_done_night else "NIE" }}</p></td>
+    </tr>
+    <tr>
+      <td>Akcja Miniona wykonana:</td>
+      <td><p id="adminMinionDone" style="text-align: center; margin: 0;">{{ "TAK" if minion_action_done_night else "NIE" }}</p></td>
     </tr>
   </table>
 
@@ -33,456 +60,113 @@
     <button id="adminShowCharactersBtn" type="button">Losuj postacie</button>
     <button id="adminDayModeBtn" type="button">Włącz tryb dzień</button>
     <button id="adminNightModeBtn" type="button">Włącz tryb noc</button>
+    <button id="adminRevealCharactersBtn" type="button">Pokaż strony postaci</button>
+    <button id="adminHideCharactersBtn" type="button">Ukryj strony postaci</button>
   </div>
 </div>
 {% endif %}
 
-{% if is_night %}
-<div class="container" style="overflow-x:auto;">
-  {% if is_imp %}
-  <table id="player_table" cellspacing="0" cellpadding="8">
-    <tr>
-      <td colspan="2" data-key="player_status" style="white-space: pre-line;">{{ player_status }}</td>
-    </tr>
-    <tr>
-      <td>Status gracza:</td>
-      <td>{{ "Martwy" if is_executed else "Żywy" }}</td>
-    </tr>
-  </table>
-
-  <div id="impNightControls" style="margin-top: 12px;">
-    <button id="impOpenActionBtn" type="button" {% if imp_action_done_night or is_executed %}disabled{% endif %}>Wyeliminuj gracza</button>
-    {% if imp_action_done_night %}
-    <p style="font-weight: bold; text-align: center;">Akcja Impa została już wykonana tej nocy.</p>
-    {% endif %}
-  </div>
-  {% elif is_minion %}
-  <table id="player_table" cellspacing="0" cellpadding="8">
-    <tr>
-      <td colspan="2" style="white-space: pre-line;">{{ minion_night_status }}</td>
-    </tr>
-    <tr>
-      <td>Status gracza:</td>
-      <td>{{ "Martwy" if is_executed else "Żywy" }}</td>
-    </tr>
-  </table>
-  {% else %}
-  <p style="text-align: center; font-weight: bold;">Tryb noc aktywowany, czekaj na rozpoczęcie dnia</p>
-  {% endif %}
-
-  {% if is_truciciel %}
-  <div id="trucicielControlsNight" style="margin-top: 12px;">
-    <button id="trucicielOpenBtnNight" type="button" {% if truciciel_action_done_night or is_executed %}disabled{% endif %}>Zatruj postać</button>
-    {% if truciciel_action_done_night %}
-    <p style="font-weight: bold; text-align: center;">Akcja Truciciela została już wykonana tej nocy.</p>
-    {% endif %}
-  </div>
-  {% endif %}
-</div>
-
-<script id="impNightViewData" type="application/json">{{ {"isImp": is_imp, "isTruciciel": is_truciciel} | tojson }}</script>
 <script>
-  const impNightViewData = JSON.parse(document.getElementById("impNightViewData").textContent);
-  const isImpNightView = !!impNightViewData.isImp;
-  const isTrucicielNightView = !!impNightViewData.isTruciciel;
-  const socketRef = window.socket || null;
+  const hubState = JSON.parse(document.getElementById("playerHubState").textContent);
+  let hubMode = hubState.mode;
 
-  function refreshPlayerPage() {
+  function goToPlayerCharacterPage() {
+    window.location.href = `/moja-postac?t=${Date.now()}`;
+  }
+
+  function goToPlayerPage() {
     window.location.href = `/player_page?t=${Date.now()}`;
   }
 
-  function bindTap(element, handler) {
-    if (!element) {
+  function refreshFromStatus(data) {
+    const modeCell = document.getElementById("hubModeValue");
+    const dayCell = document.getElementById("hubDayNumberValue");
+
+    if (modeCell && (data.mode === "day" || data.mode === "night")) {
+      modeCell.textContent = data.mode === "day" ? "Dzień" : "Noc";
+    }
+
+    if (dayCell && typeof data.day_number !== "undefined") {
+      dayCell.textContent = String(data.day_number);
+    }
+
+    if (hubState.isAdmin) {
+      const liczbaGraczy = document.getElementById("adminLiczbaGraczy");
+      const postacieWylosowane = document.getElementById("adminPostacieWylosowane");
+      const pagesVisible = document.getElementById("adminCharacterPagesVisible");
+      const impDone = document.getElementById("adminImpDone");
+      const minionDone = document.getElementById("adminMinionDone");
+
+      if (liczbaGraczy && typeof data.no_of_players !== "undefined") {
+        liczbaGraczy.textContent = String(data.no_of_players);
+      }
+      if (postacieWylosowane && typeof data.char_presented !== "undefined") {
+        postacieWylosowane.textContent = data.char_presented ? "TAK" : "NIE";
+      }
+      if (pagesVisible && typeof data.character_pages_visible !== "undefined") {
+        pagesVisible.textContent = data.character_pages_visible ? "TAK" : "NIE";
+      }
+      if (impDone && typeof data.imp_action_done_night !== "undefined") {
+        impDone.textContent = data.imp_action_done_night ? "TAK" : "NIE";
+      }
+      if (minionDone && typeof data.truciciel_action_done_night !== "undefined") {
+        minionDone.textContent = data.truciciel_action_done_night ? "TAK" : "NIE";
+      }
+    }
+
+    if (data.execution_vote_active) {
+      window.location.href = `/execution-vote?t=${Date.now()}&client_id=${encodeURIComponent(hubState.clientId || "")}`;
       return;
     }
 
-    let touchHandled = false;
-    let lastHandledAt = 0;
-
-    const runHandler = event => {
-      const now = Date.now();
-      if (now - lastHandledAt < 450) {
+    if (typeof data.character_pages_visible !== "undefined") {
+      if (data.character_pages_visible) {
+        goToPlayerCharacterPage();
         return;
       }
-      lastHandledAt = now;
+    }
 
-      if (event && event.cancelable) {
-        event.preventDefault();
-      }
-
-      touchHandled = true;
-      handler();
-      setTimeout(() => {
-        touchHandled = false;
-      }, 350);
-    };
-
-    element.addEventListener("pointerup", event => {
-      if (event.pointerType === "mouse" && event.button !== 0) {
-        return;
-      }
-      runHandler(event);
-    });
-
-    element.addEventListener(
-      "touchstart",
-      event => {
-        runHandler(event);
-      },
-      { passive: false }
-    );
-
-    element.addEventListener(
-      "touchend",
-      event => {
-        if (touchHandled) {
-          return;
-        }
-        runHandler(event);
-      },
-      { passive: false }
-    );
-
-    element.addEventListener("click", event => {
-      if (touchHandled) {
-        event.preventDefault();
-        return;
-      }
-      handler();
-    });
-  }
-
-  if (isImpNightView) {
-    const impOpenActionBtn = document.getElementById("impOpenActionBtn");
-    bindTap(impOpenActionBtn, () => {
-      window.location.href = "/imp-akcja";
-    });
-
-    if (socketRef) {
-      socketRef.on("imp_action_result", () => {
-        refreshPlayerPage();
-      });
-
-      socketRef.on("imp_action_error", () => {
-        refreshPlayerPage();
-      });
+    if ((data.mode === "day" || data.mode === "night") && data.mode !== hubMode) {
+      hubMode = data.mode;
+      goToPlayerPage();
     }
   }
 
-  if (isTrucicielNightView) {
-    const trucicielOpenBtnNight = document.getElementById("trucicielOpenBtnNight");
-    bindTap(trucicielOpenBtnNight, () => {
-      window.location.href = "/truciciel-akcja";
-    });
-  }
-
-  if (socketRef) {
-    socketRef.on("update_game_status", data => {
-      if (data.mode === "day") {
-        refreshPlayerPage();
-      }
-    });
-
-    socketRef.on("force_player_page_refresh", () => {
-      refreshPlayerPage();
-    });
-  }
-</script>
-{% else %}
-<div class="container" style="overflow-x:auto;">
-  <table id="player_table" cellspacing="0" cellpadding="8">
-    <tr>
-      <td  style="text-align:center; width:30%;">
-        <a data-key="player_link" href="{{ player_link }}">
-          <img data-key="player_image"
-               style="width: 30%; height: auto; cursor: pointer;"
-               src="{{ player_image }}">
-        </a>
-      </td>
-      <td data-key="player_info" style="width:70%; vertical-align:top; white-space: pre-line;">{{ player_info }}</td>
-    </tr>
-    <tr>
-      <td colspan="2" data-key="player_status" style="white-space: pre-line;">{{ player_status }}</td>
-    </tr>
-    <tr>
-      <td>Status gracza:</td>
-      <td>{{ "Martwy" if is_executed else "Żywy" }}</td>
-    </tr>
-  </table>
-
-  <div id="executionControls" style="margin-top: 20px;">
-    <button id="nominateBtn" type="button" style="display: none;">Nominuj do wyeliminowania</button>
-    {% if is_jasnowidz %}
-    <button id="jasnowidzOpenBtn" type="button" {% if jasnowidz_used_today or is_executed %}disabled{% endif %}>Akcja jasnowidza</button>
-    {% endif %}
-    <button id="wikiBtn" type="button">Wiki z listą postaci</button>
-    {% if is_admin %}
-    <button id="adminPanelBtn" type="button">Panel administratora</button>
-    {% endif %}
-  </div>
-
-</div>
-
-<script id="playerStateData" type="application/json">{{ {"clientId": client_id, "executed": is_executed, "voteDead": vote_dead} | tojson }}</script>
-<script id="jasnowidzStateData" type="application/json">{{ {"isJasnowidz": is_jasnowidz, "usedToday": jasnowidz_used_today} | tojson }}</script>
-
-<script>
-  const playerState = JSON.parse(document.getElementById("playerStateData").textContent);
-  const jasnowidzState = JSON.parse(document.getElementById("jasnowidzStateData").textContent);
-
-  const nominateBtn = document.getElementById("nominateBtn");
-  const jasnowidzOpenBtn = document.getElementById("jasnowidzOpenBtn");
-  const wikiBtn = document.getElementById("wikiBtn");
-  const adminPanelBtn = document.getElementById("adminPanelBtn");
-
-
-  function refreshPlayerPage() {
-    window.location.href = `/player_page?t=${Date.now()}`;
-  }
-
-  function canNominate() {
-    return !playerState.executed;
-  }
-
-  function canVote() {
-    return !playerState.executed || playerState.voteDead;
-  }
-
-  function renderNominationControls() {
-    nominateBtn.style.display = canNominate() ? "block" : "none";
-  }
-
-  function bindTap(element, handler) {
-    if (!element) {
-      return;
-    }
-
-    let touchHandled = false;
-    let lastHandledAt = 0;
-
-    const runHandler = event => {
-      const now = Date.now();
-      if (now - lastHandledAt < 450) {
-        return;
-      }
-      lastHandledAt = now;
-
-      if (event && event.cancelable) {
-        event.preventDefault();
-      }
-
-      touchHandled = true;
-      handler();
-      setTimeout(() => {
-        touchHandled = false;
-      }, 350);
-    };
-
-    // Pointer events work reliably on modern mobile browsers.
-    element.addEventListener("pointerup", event => {
-      if (event.pointerType === "mouse" && event.button !== 0) {
-        return;
-      }
-      runHandler(event);
-    });
-
-    // iOS Safari fallback: touchstart is often the most reliable trigger.
-    element.addEventListener(
-      "touchstart",
-      event => {
-        runHandler(event);
-      },
-      { passive: false }
-    );
-
-    // Fallback for older mobile browsers without pointer events.
-    element.addEventListener(
-      "touchend",
-      event => {
-        if (touchHandled) {
-          return;
-        }
-        runHandler(event);
-      },
-      { passive: false }
-    );
-
-    element.addEventListener("click", event => {
-      if (touchHandled) {
-        event.preventDefault();
-        return;
-      }
-      handler();
-    });
-  }
-
-  renderNominationControls();
-
-  if (jasnowidzState.isJasnowidz && jasnowidzOpenBtn) {
-    bindTap(jasnowidzOpenBtn, () => {
-      window.location.href = "/jasnowidz-akcja";
-    });
-  }
-
-  bindTap(nominateBtn, () => {
-    window.location.href = "/nomination";
-  });
-
-  bindTap(wikiBtn, () => {
-    window.location.href = "{{ url_for('handle_wiki', back='player_page') }}";
-  });
-
-  bindTap(adminPanelBtn, () => {
-    window.location.href = "{{ url_for('handle_menu') }}";
-  });
-
-  socket.on("update_player_status", data => {
-    console.log("🔄 Otrzymano update_player_status:", data);
-
-    for (const [key, value] of Object.entries(data)) {
-      const el = document.querySelector(`[data-key="${key}"]`);
-      if (!el) continue;
-
-      // obsługa obrazka
-      if (el.tagName === "IMG") {
-        el.src = value;
-      }
-      // obsługa linku
-      else if (el.tagName === "A") {
-        el.href = value;
-      }
-      // obsługa tekstu
-      else {
-        el.textContent = value;
-      }
-
-      // krótka animacja podświetlenia zmienionego elementu
-      el.style.transition = "background-color 0.4s";
-      el.style.backgroundColor = "#fff3cd";
-      setTimeout(() => el.style.backgroundColor = "", 600);
-    }
-  });
-
-  socket.on("update_game_status", data => {
-    if (data.mode === "night") {
-      refreshPlayerPage();
-    }
-  });
-
-  socket.on("force_player_page_refresh", () => {
-    refreshPlayerPage();
-  });
-</script>
-{% endif %}
-
-<script>
-  const modeState = JSON.parse(document.getElementById("modeStateData").textContent);
-  let isReloadingForModeChange = false;
-
-  function redirectForModeChange() {
-    if (isReloadingForModeChange) {
-      return;
-    }
-    isReloadingForModeChange = true;
-    window.location.href = `/player_page?t=${Date.now()}`;
-  }
-
-  async function checkModeFallback() {
+  async function checkStatus() {
     try {
       const response = await fetch("/game-status", { cache: "no-store" });
       if (!response.ok) {
         return;
       }
-
       const data = await response.json();
-
-      const adminLiczbaGraczy = document.getElementById("adminLiczbaGraczy");
-      const adminPostacieWylosowane = document.getElementById("adminPostacieWylosowane");
-      const adminAktualnyTryb = document.getElementById("adminAktualnyTryb");
-      const adminImpActionStatusRow = document.getElementById("adminImpActionStatusRow");
-      const adminImpActionStatus = document.getElementById("adminImpActionStatus");
-
-      if (adminLiczbaGraczy && typeof data.no_of_players !== "undefined") {
-        adminLiczbaGraczy.textContent = data.no_of_players;
-      }
-
-      if (adminPostacieWylosowane && typeof data.char_presented !== "undefined") {
-        adminPostacieWylosowane.textContent = data.char_presented ? "TAK" : "NIE";
-      }
-
-      if (adminAktualnyTryb && (data.mode === "day" || data.mode === "night")) {
-        adminAktualnyTryb.textContent = data.mode === "day" ? "Dzień" : "Noc";
-      }
-
-      if (adminImpActionStatusRow && (data.mode === "day" || data.mode === "night")) {
-        adminImpActionStatusRow.style.display = data.mode === "night" ? "table-row" : "none";
-      }
-
-      if (adminImpActionStatus && typeof data.night_actions_pending !== "undefined") {
-        adminImpActionStatus.textContent = data.night_actions_pending
-          ? "Jeszcze się zastanawia"
-          : "Wykonana";
-      }
-
-      if (data.execution_vote_active) {
-        window.location.href = `/execution-vote?t=${Date.now()}&client_id=${encodeURIComponent(window.clientId || "")}`;
-        return;
-      }
-
-      if ((data.mode === "day" || data.mode === "night") && data.mode !== modeState.mode) {
-        redirectForModeChange();
-      }
+      refreshFromStatus(data);
     } catch (err) {
-      console.warn("Fallback mode check failed:", err);
+      console.warn("Status check failed:", err);
     }
   }
 
-  checkModeFallback();
-  setInterval(checkModeFallback, 1000);
+  const nominateBtn = document.getElementById("nominateBtn");
+  if (nominateBtn) {
+    nominateBtn.addEventListener("click", () => {
+      window.location.href = "/nomination";
+    });
+  }
 
-  document.addEventListener("visibilitychange", () => {
-    if (!document.hidden) {
-      checkModeFallback();
-    }
-  });
-
-  window.addEventListener("pageshow", () => {
-    checkModeFallback();
-  });
-
-  window.addEventListener("focus", () => {
-    checkModeFallback();
-  });
-
-  socket.on("connect", () => {
-    checkModeFallback();
-  });
-</script>
-
-{% if is_admin %}
-<script>
-  (function setupAdminControls() {
-    const adminPanel = document.getElementById("adminCombinedPanel");
-    if (!adminPanel) {
-      return;
-    }
-
+  if (hubState.isAdmin) {
     const adminErrorMsg = document.getElementById("adminErrorMsg");
-    const adminLiczbaGraczy = document.getElementById("adminLiczbaGraczy");
-    const adminPostacieWylosowane = document.getElementById("adminPostacieWylosowane");
-    const adminAktualnyTryb = document.getElementById("adminAktualnyTryb");
-    const adminImpActionStatusRow = document.getElementById("adminImpActionStatusRow");
-    const adminImpActionStatus = document.getElementById("adminImpActionStatus");
-
     const adminShowCharactersBtn = document.getElementById("adminShowCharactersBtn");
     const adminDayModeBtn = document.getElementById("adminDayModeBtn");
     const adminNightModeBtn = document.getElementById("adminNightModeBtn");
+    const adminRevealCharactersBtn = document.getElementById("adminRevealCharactersBtn");
+    const adminHideCharactersBtn = document.getElementById("adminHideCharactersBtn");
 
     function setAdminError(text) {
-      adminErrorMsg.textContent = text || "";
+      if (adminErrorMsg) {
+        adminErrorMsg.textContent = text || "";
+      }
     }
 
-    async function showCharacters() {
+    async function callCreateShow() {
       setAdminError("");
       try {
         const response = await fetch("/create", {
@@ -490,18 +174,16 @@
           headers: { "Content-Type": "application/x-www-form-urlencoded" },
           body: new URLSearchParams({ event: "show" })
         });
-
         if (!response.ok) {
           const res = await response.json();
-          setAdminError(res.error || "Nie udało się rozdzielić postaci.");
+          setAdminError(res.error || "Nie udało się rozlosować postaci.");
         }
       } catch (err) {
-        console.error(err);
         setAdminError("Błąd połączenia z serwerem.");
       }
     }
 
-    async function setGameMode(mode) {
+    async function setMode(mode) {
       setAdminError("");
       try {
         const response = await fetch("/game-mode", {
@@ -509,44 +191,64 @@
           headers: { "Content-Type": "application/x-www-form-urlencoded" },
           body: new URLSearchParams({ mode })
         });
-
         if (!response.ok) {
           const res = await response.json();
           setAdminError(res.error || "Nie udało się zmienić trybu gry.");
         }
       } catch (err) {
-        console.error(err);
         setAdminError("Błąd połączenia z serwerem.");
       }
     }
 
-    adminShowCharactersBtn.addEventListener("click", showCharacters);
-    adminDayModeBtn.addEventListener("click", () => setGameMode("day"));
-    adminNightModeBtn.addEventListener("click", () => setGameMode("night"));
-
-    socket.on("update_game_status", data => {
-      if (typeof data.no_of_players !== "undefined") {
-        adminLiczbaGraczy.textContent = data.no_of_players;
-      }
-
-      if (typeof data.char_presented !== "undefined") {
-        adminPostacieWylosowane.textContent = data.char_presented ? "TAK" : "NIE";
-      }
-
-      if (data.mode === "day" || data.mode === "night") {
-        adminAktualnyTryb.textContent = data.mode === "day" ? "Dzień" : "Noc";
-        if (adminImpActionStatusRow) {
-          adminImpActionStatusRow.style.display = data.mode === "night" ? "table-row" : "none";
+    async function setCharacterPagesVisibility(visible) {
+      setAdminError("");
+      try {
+        const response = await fetch("/character-pages-visibility", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ visible })
+        });
+        if (!response.ok) {
+          const res = await response.json();
+          setAdminError(res.error || "Nie udało się zmienić widoczności stron postaci.");
         }
+      } catch (err) {
+        setAdminError("Błąd połączenia z serwerem.");
       }
+    }
 
-      if (typeof data.night_actions_pending !== "undefined" && adminImpActionStatus) {
-        adminImpActionStatus.textContent = data.night_actions_pending
-          ? "Jeszcze się zastanawia"
-          : "Wykonana";
-      }
-    });
-  })();
+    if (adminShowCharactersBtn) {
+      adminShowCharactersBtn.addEventListener("click", callCreateShow);
+    }
+    if (adminDayModeBtn) {
+      adminDayModeBtn.addEventListener("click", () => setMode("day"));
+    }
+    if (adminNightModeBtn) {
+      adminNightModeBtn.addEventListener("click", () => setMode("night"));
+    }
+    if (adminRevealCharactersBtn) {
+      adminRevealCharactersBtn.addEventListener("click", () => setCharacterPagesVisibility(true));
+    }
+    if (adminHideCharactersBtn) {
+      adminHideCharactersBtn.addEventListener("click", () => setCharacterPagesVisibility(false));
+    }
+  }
+
+  socket.on("update_game_status", refreshFromStatus);
+  socket.on("force_player_page_refresh", () => {
+    checkStatus();
+  });
+
+  checkStatus();
+  setInterval(checkStatus, 1000);
+
+  document.addEventListener("visibilitychange", () => {
+    if (!document.hidden) {
+      checkStatus();
+    }
+  });
+
+  window.addEventListener("focus", checkStatus);
+  window.addEventListener("pageshow", checkStatus);
 </script>
-{% endif %}
 {% endblock %}

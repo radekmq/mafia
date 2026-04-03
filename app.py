@@ -28,6 +28,7 @@ db_game = {
     "nominator_last_day": {},
     "imp_action_done_night": False,
     "truciciel_action_done_night": False,
+    "character_pages_visible": False,
 }
 db_game_selection = None
 
@@ -56,7 +57,7 @@ execution_vote_state = {
     "last_result": None,
 }
 
-ALLOWED_BACK_ENDPOINTS = {"lobby", "handle_menu", "index", "player_page"}
+ALLOWED_BACK_ENDPOINTS = {"lobby", "handle_menu", "index", "player_page", "player_character_page"}
 
 
 def parse_seat(raw_seat):
@@ -122,13 +123,15 @@ def build_nomination_candidates_payload(client_id):
     return {"players": candidates}
 
 
-def get_sorted_player_options():
+def get_sorted_player_options(executed_filter=None):
     players = []
     for listed_client_id, player in sorted(
         db_players.get_all().items(),
         key=lambda item: item[1].get("seat") or 9999,
     ):
         ensure_player_flags(player)
+        if executed_filter is not None and player.get("executed", False) != executed_filter:
+            continue
         players.append(
             {
                 "client_id": listed_client_id,
@@ -312,6 +315,7 @@ def build_game_status_payload():
         "game_status": db_game["game_active"],
         "game_active": db_game["game_active"],
         "char_presented": db_game["char_presented"],
+        "character_pages_visible": db_game.get("character_pages_visible", False),
         "mode": db_game["mode"],
         "day_number": db_game.get("day_number", 1),
         "imp_action_done_night": imp_done,
@@ -470,6 +474,7 @@ def reset_all_game_state():
     db_game["nominator_last_day"] = {}
     db_game["imp_action_done_night"] = False
     db_game["truciciel_action_done_night"] = False
+    db_game["character_pages_visible"] = False
 
     clients.clear()
     db_players._data.clear()
@@ -1014,11 +1019,15 @@ def get_resume_redirect_endpoint(client_id):
 
     if client_id == db_game.get("admin_id"):
         if db_game.get("char_presented") and db_game_selection:
+            if db_game.get("character_pages_visible"):
+                return "player_character_page"
             return "player_page"
         return "handle_menu"
 
     if client_id in db_players:
         if db_game.get("char_presented") and db_game_selection:
+            if db_game.get("character_pages_visible"):
+                return "player_character_page"
             return "player_page"
         return "lobby"
 
@@ -1240,6 +1249,8 @@ def save_player():
 
         if is_admin_login:
             if db_game.get("char_presented") and db_game_selection:
+                if db_game.get("character_pages_visible"):
+                    return redirect(url_for("player_character_page"))
                 return redirect(url_for("player_page"))
             return redirect(url_for("handle_menu"))
 
@@ -1281,6 +1292,7 @@ def game_status():
         "no_of_players": len(db_players),
         "game_active": status_payload["game_active"],
         "char_presented": status_payload["char_presented"],
+        "character_pages_visible": status_payload.get("character_pages_visible", False),
         "mode": status_payload["mode"],
         "day_number": status_payload.get("day_number", 1),
         "imp_action_done_night": status_payload.get("imp_action_done_night", False),
@@ -1412,6 +1424,25 @@ def set_game_mode():
     db_game["mode"] = mode
     socketio.emit("update_game_status", build_game_status_payload())
     return jsonify({"status": "ok", "mode": mode}), 200
+
+
+@app.route("/character-pages-visibility", methods=["POST"])
+def set_character_pages_visibility():
+    client_id = session.get("client_id")
+    if client_id != db_game.get("admin_id"):
+        return jsonify({"error": "Brak uprawnień."}), 403
+
+    payload = request.get_json(silent=True) or {}
+    visible = bool(payload.get("visible"))
+    db_game["character_pages_visible"] = visible
+
+    socketio.emit("update_game_status", build_game_status_payload())
+    if visible:
+        redirect_players_to_endpoint("player_character_page")
+    else:
+        redirect_players_to_endpoint("player_page")
+
+    return jsonify({"status": "ok", "character_pages_visible": visible}), 200
     
 @app.route("/create", methods=["GET", "POST"])
 def create():
@@ -1427,16 +1458,9 @@ def create():
             db_game["nominator_last_day"] = {}
             db_game["imp_action_done_night"] = False
             db_game["truciciel_action_done_night"] = False
+            db_game["character_pages_visible"] = False
             
-            socketio.emit("update_game_status", { 
-                                                "no_of_players": db_game["no_of_players"], 
-                                                "game_status": "Gra przygotowana, oczekuj na losowanie postaci.",
-                                                "game_active": db_game["game_active"],
-                                                "char_presented": db_game["char_presented"],
-                                                "mode": db_game["mode"],
-                                                "imp_action_done_night": db_game["imp_action_done_night"],
-                                                "truciciel_action_done_night": db_game["truciciel_action_done_night"],
-                                                })
+            socketio.emit("update_game_status", build_game_status_payload())
         elif event == "show":
             print(f"[create] Otrzymano żądanie losowania postaci od client_id={client_id}")
             if len(db_players) < 5:
@@ -1449,15 +1473,8 @@ def create():
             db_game["nominator_last_day"] = {}
             db_game["imp_action_done_night"] = False
             db_game["truciciel_action_done_night"] = False
-            socketio.emit("update_game_status", { 
-                                                "no_of_players": db_game["no_of_players"], 
-                                                "game_status": "Postacie zostały rozlosowane.",
-                                                "game_active": db_game["game_active"],
-                                                "char_presented": db_game["char_presented"],
-                                                "mode": db_game["mode"],
-                                                "imp_action_done_night": db_game["imp_action_done_night"],
-                                                "truciciel_action_done_night": db_game["truciciel_action_done_night"],
-                                                })
+            db_game["character_pages_visible"] = False
+            socketio.emit("update_game_status", build_game_status_payload())
             
             print("\n\n")
             global db_game_selection
@@ -1676,7 +1693,69 @@ def redirect_players_to_character_pages():
         print(f"[redirect_players_to_character_pages] Przetwarzam client_id={client_id}, player={player}")
         print(f"[redirect_players_to_character_pages] player.name={player.get('name')}, player.character={player.get('character')}, player.sid={player.get('sid')}")
 
+    if db_game.get("character_pages_visible"):
+        redirect_players_to_endpoint("player_character_page", target_client_ids=target_client_ids)
+        return
+
     redirect_players_to_endpoint("player_page", target_client_ids=target_client_ids)
+
+
+@app.route("/moja-postac")
+def player_character_page():
+    client_id = session.get("client_id")
+    if client_id is None:
+        return redirect(url_for("index"))
+    if db_game.get("winner"):
+        return redirect(url_for("menu_koniec_gry"))
+    if not db_game_selection:
+        return redirect(url_for("index"))
+    if execution_vote_state["active"]:
+        return redirect(url_for("execution_vote_page"))
+    if not db_game.get("character_pages_visible"):
+        return redirect(url_for("player_page"))
+
+    real_character, visible_character = get_player_character_views(client_id)
+    if not visible_character:
+        abort(404, description=f"Brak postaci o client_id={client_id}")
+
+    ensure_player_flags(db_players[client_id])
+    is_imp = bool(real_character and real_character.get("name") == "Imp")
+    is_minion = bool(
+        real_character
+        and any(
+            char.get("client_id") == client_id
+            for char in db_game_selection.get("Minionki", [])
+        )
+    )
+    is_jasnowidz = bool(real_character and real_character.get("name") == "Jasnowidz")
+    is_truciciel = bool(real_character and real_character.get("name") == "Truciciel")
+    minion_night_status = build_minion_night_status() if is_minion else ""
+
+    jasnowidz_used_today = False
+    if is_jasnowidz:
+        jasnowidz_used_today = real_character.get("jasnowidz_last_day_used") == db_game.get("day_number", 1)
+
+    template_name = f"player_roles/{visible_character['route']}.html"
+    return render_template(
+        template_name,
+        client_id=client_id,
+        role_name=visible_character.get("name", "Nieznana postać"),
+        player_status=get_stable_player_status(visible_character),
+        player_info=visible_character["player_info"],
+        player_image=f"/static/images/{visible_character['file']}",
+        player_link=url_for("postac", route=visible_character["route"], back="player_character_page"),
+        is_executed=db_players[client_id]["executed"],
+        current_mode=db_game.get("mode", "day"),
+        day_number=db_game.get("day_number", 1),
+        is_imp=is_imp,
+        is_minion=is_minion,
+        is_jasnowidz=is_jasnowidz,
+        jasnowidz_used_today=jasnowidz_used_today,
+        is_truciciel=is_truciciel,
+        truciciel_action_done_night=db_game.get("truciciel_action_done_night", False),
+        minion_night_status=minion_night_status,
+        imp_action_done_night=db_game.get("imp_action_done_night", False),
+    )
 
 
 @app.route("/player_page")
@@ -1691,64 +1770,23 @@ def player_page():
     if execution_vote_state["active"]:
         return redirect(url_for("execution_vote_page"))
     
-    real_character, visible_character = get_player_character_views(client_id)
-    if not visible_character:
-        abort(404, description=f"Brak postaci o client_id={client_id}")
-
-    player_status = get_stable_player_status(visible_character)
-    player_info = visible_character["player_info"]
-    player_image = f"/static/images/{visible_character['file']}"
-    player_link = url_for("postac", route=visible_character["route"], back="player_page")
     ensure_player_flags(db_players[client_id])
-    is_imp = bool(real_character and real_character.get("name") == "Imp")
-    is_minion = bool(
-        real_character
-        and any(
-            char.get("client_id") == client_id
-            for char in db_game_selection.get("Minionki", [])
-        )
-    )
-    is_jasnowidz = bool(real_character and real_character.get("name") == "Jasnowidz")
-    is_truciciel = bool(real_character and real_character.get("name") == "Truciciel")
-    minion_night_status = build_minion_night_status() if is_minion else ""
 
-    night_players = get_sorted_player_options()
+    if db_game.get("character_pages_visible"):
+        return redirect(url_for("player_character_page"))
 
-    jasnowidz_used_today = False
-    if is_jasnowidz:
-        jasnowidz_used_today = real_character.get("jasnowidz_last_day_used") == db_game.get("day_number", 1)
-
-    truciciel_action_done_night = db_game.get("truciciel_action_done_night", False)
-
-    if real_character and real_character.get("name") == "Pijak":
-        print(
-            "[player_page] Render masked role for Drunk "
-            f"client_id={client_id}, visible_role={visible_character.get('name')}"
-        )
+    is_admin = client_id == db_game.get("admin_id")
 
     return render_template(
         "player_page.html",
         client_id=client_id,
-        player_status=player_status,
-        player_info=player_info,
-        player_image=player_image,
-        player_link=player_link,
         is_executed=db_players[client_id]["executed"],
-        vote_dead=db_players[client_id]["vote_dead"],
-        is_night=(db_game.get("mode") == "night"),
         current_mode=db_game.get("mode", "day"),
         day_number=db_game.get("day_number", 1),
-        is_imp=is_imp,
-        is_minion=is_minion,
-        is_jasnowidz=is_jasnowidz,
-        jasnowidz_used_today=jasnowidz_used_today,
-        is_truciciel=is_truciciel,
-        truciciel_action_done_night=truciciel_action_done_night,
-        minion_night_status=minion_night_status,
         imp_action_done_night=db_game.get("imp_action_done_night", False),
-        night_actions_pending=build_game_status_payload().get("night_actions_pending", False),
-        night_players=night_players,
-        is_admin=(client_id == db_game.get("admin_id")),
+        minion_action_done_night=db_game.get("truciciel_action_done_night", False),
+        character_pages_visible=db_game.get("character_pages_visible", False),
+        is_admin=is_admin,
         liczba_graczy=len(db_players),
         char_presented=db_game.get("char_presented", False),
     )
@@ -1871,6 +1909,8 @@ def imp_action_page():
 
     if execution_vote_state["active"]:
         return redirect(url_for("execution_vote_page"))
+    if not db_game.get("character_pages_visible"):
+        return redirect(url_for("player_page"))
 
     ensure_player_flags(db_players[client_id])
     real_character, visible_character = get_player_character_views(client_id)
@@ -1893,8 +1933,8 @@ def imp_action_page():
         result_message = (request.args.get("message") or "").strip()
 
     return render_template(
-        "imp_action.html",
-        candidates=get_sorted_player_options(),
+        "player_actions/imp_action.html",
+        candidates=get_sorted_player_options(False),
         is_executed=db_players[client_id]["executed"],
         used_night=db_game.get("imp_action_done_night", False),
         status_text=get_stable_player_status(visible_character),
@@ -1915,6 +1955,8 @@ def truciciel_action_page():
 
     if execution_vote_state["active"]:
         return redirect(url_for("execution_vote_page"))
+    if not db_game.get("character_pages_visible"):
+        return redirect(url_for("player_page"))
 
     ensure_player_flags(db_players[client_id])
     real_character, visible_character = get_player_character_views(client_id)
@@ -1937,7 +1979,7 @@ def truciciel_action_page():
     used_today = db_game.get("truciciel_action_done_night", False)
 
     return render_template(
-        "truciciel_action.html",
+        "player_actions/truciciel_action.html",
         day_number=day_number,
         candidates=get_sorted_player_options(),
         is_executed=db_players[client_id]["executed"],
@@ -1959,6 +2001,8 @@ def jasnowidz_action_page():
 
     if execution_vote_state["active"]:
         return redirect(url_for("execution_vote_page"))
+    if not db_game.get("character_pages_visible"):
+        return redirect(url_for("player_page"))
 
     ensure_player_flags(db_players[client_id])
     real_character, visible_character = get_player_character_views(client_id)
@@ -1982,7 +2026,7 @@ def jasnowidz_action_page():
     used_today = real_character.get("jasnowidz_last_day_used") == day_number
 
     return render_template(
-        "jasnowidz_action.html",
+        "player_actions/jasnowidz_action.html",
         day_number=day_number,
         candidates=get_sorted_player_options(),
         is_executed=db_players[client_id]["executed"],

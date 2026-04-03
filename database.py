@@ -102,7 +102,7 @@ db_characters = {
             "file": "truciciel.png", 
             "route": "truciciel", 
             "player_status": fun_truciciel, 
-            "player_info": "Każdego dnia wybierz gracza: tej nocy i następnego dnia ten gracz jest zatruty. Truciciel potajemnie zakłóca działanie zdolności postaci."
+            "player_info": "Każdej nocy wybierz gracza: tej nocy i następnego dnia ten gracz jest zatruty. Truciciel potajemnie zakłóca działanie zdolności postaci."
         },
         # {"client_id": None, "name": "Szpieg", "file": "szpieg.png", "route": "szpieg", "player_status": fun_szpieg, "player_info": "TBD"},
         # {"client_id": None, "name": "Scarlet Woman", "file": "scarlet.png", "route": "scarlet", "player_status": fun_scarlet, "player_info": "TBD"},

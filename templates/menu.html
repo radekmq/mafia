@@ -3,253 +3,242 @@
 {% block title %}Blood on the clocktower – Strona główna{% endblock %}
 
 {% block content %}
-  
 
-  <div class="container">
-    <h3>Panel administratora gry!</h3>
+<div class="container">
+  <h3>Panel administratora gry!</h3>
 
-    <div style="overflow-x:auto;">
-      <p id="errorMsg" style="color: red; font-weight: bold;"></p>
-      <table>
-        <tr>
-          <td>Aktualna liczba graczy:</td>
-          <td ><p id="liczba_graczy" style="text-align: center;">{{liczba_graczy}}</p></td>
-        </tr>
-        <tr>
-          <td>Postacie wylosowane:</td>
-          <td ><p id="postacie_wylosowane" style="text-align: center;">{{ "TAK" if char_presented else "NIE" }}</p></td>
-        </tr>
-        <tr>
-          <td>Aktualny tryb:</td>
-          <td><p id="aktualny_tryb" style="text-align: center;">{{ "Dzień" if current_mode == "day" else "Noc" }}</p></td>
-        </tr>
-        <tr id="impActionStatusRow" {% if current_mode != "night" %}style="display: none;"{% endif %}>
-          <td>Akcje nocne (Demon + Truciciel):</td>
-          <td><p id="imp_action_status" style="text-align: center;">{{ "Jeszcze się zastanawia" if night_actions_pending else "Wykonana" }}</p></td>
-        </tr>
-        <tr id="showCharactersRow">
-          <td colspan="2" style="text-align: center;">Losuj postacie</td>
-        </tr>
-        <tr id="dayModeRow">
-          <td colspan="2" style="text-align: center;">Włącz tryb dzień</td>
-        </tr>
-        <tr id="nightModeRow">
-          <td colspan="2" style="text-align: center;">Włącz tryb noc</td>
-        </tr>
-      </table>
-      {% if char_presented %}
-      <button type="button" id="openPlayerPanelBtn" data-href="{{ url_for('player_page') }}">Panel gracza</button>
-      {% endif %}
-      <button type="button" data-href="{{ url_for('handle_wiki', back='handle_menu') }}" onclick="window.location.href=this.dataset.href">Wiki z listą postaci</button>
-    </div>
+  <div style="overflow-x:auto;">
+    <p id="errorMsg" style="color: red; font-weight: bold;"></p>
 
-    <!-- <blockquote>„Księgi są zwierciadłami duszy – im spokojniej je czytasz, tym więcej widzisz.”</blockquote> -->
+    <table>
+      <tr>
+        <td>Aktualna liczba graczy:</td>
+        <td><p id="liczba_graczy" style="text-align: center;">{{liczba_graczy}}</p></td>
+      </tr>
+
+      <tr>
+        <td>Postacie wylosowane:</td>
+        <td><p id="postacie_wylosowane" style="text-align: center;">
+          {{ "TAK" if char_presented else "NIE" }}
+        </p></td>
+      </tr>
+
+      <tr>
+        <td>Aktualny tryb:</td>
+        <td><p id="aktualny_tryb" style="text-align: center;">
+          {{ "Dzień" if current_mode == "day" else "Noc" }}
+        </p></td>
+      </tr>
+
+      <tr id="impActionStatusRow" {% if current_mode != "night" %}style="display: none;"{% endif %}>
+        <td>Akcje nocne (Demon + Truciciel):</td>
+        <td><p id="imp_action_status" style="text-align: center;">
+          {{ "Jeszcze się zastanawia" if night_actions_pending else "Wykonana" }}
+        </p></td>
+      </tr>
+
+      <tr id="showCharactersRow">
+        <td colspan="2" style="text-align: center;">Losuj postacie</td>
+      </tr>
+
+      <tr id="dayModeRow">
+        <td colspan="2" style="text-align: center;">Włącz tryb dzień</td>
+      </tr>
+
+      <tr id="nightModeRow">
+        <td colspan="2" style="text-align: center;">Włącz tryb noc</td>
+      </tr>
+    </table>
+
+    {% if char_presented %}
+    <button type="button" id="openPlayerPanelBtn"
+            data-href="{{ url_for('player_page') }}">
+      Panel gracza
+    </button>
+    {% endif %}
+
+    <button type="button"
+            onclick="window.location.href='{{ url_for('handle_wiki', back='handle_menu') }}'">
+      Wiki z listą postaci
+    </button>
   </div>
+</div>
 
-  <script>
-    function bindTap(element, handler) {
-      if (!element) {
-        return;
-      }
+<!-- ========================= -->
+<!-- SCRIPTS NA DOLE -->
+<!-- ========================= -->
+<script>
 
-      let touchHandled = false;
-      let lastHandledAt = 0;
+  /**********************
+   * SOCKET.IO SAFE INIT
+   **********************/
+  function initSocket() {
+    // sprawdzamy czy Socket.IO istnieje
+    if (typeof io === "undefined") {
+      console.warn("Socket.IO nie jest dostępne.");
 
-      const runHandler = event => {
-        const now = Date.now();
-        if (now - lastHandledAt < 450) {
-          return;
-        }
-        lastHandledAt = now;
-
-        if (event && event.cancelable) {
-          event.preventDefault();
-        }
-
-        touchHandled = true;
-        handler();
-        setTimeout(() => {
-          touchHandled = false;
-        }, 350);
-      };
-
-      element.addEventListener("pointerup", event => {
-        if (event.pointerType === "mouse" && event.button !== 0) {
-          return;
-        }
-        runHandler(event);
-      });
-
-      element.addEventListener(
-        "touchstart",
-        event => {
-          runHandler(event);
-        },
-        { passive: false }
-      );
-
-      element.addEventListener(
-        "touchend",
-        event => {
-          if (touchHandled) {
-            return;
-          }
-          runHandler(event);
-        },
-        { passive: false }
-      );
-
-      element.addEventListener("click", event => {
-        if (touchHandled) {
-          event.preventDefault();
-          return;
-        }
-        handler();
-      });
+      showBrowserWarning();
+      return null;
     }
 
-    function applyGameStatus(data) {
-      if (typeof data.no_of_players !== "undefined") {
-        document.getElementById("liczba_graczy").textContent = data.no_of_players;
-      }
+    try {
+      const socket = io();
 
-      if (typeof data.char_presented !== "undefined") {
-        document.getElementById("postacie_wylosowane").textContent = data.char_presented ? "TAK" : "NIE";
-      }
+      socket.on("connect", () => {
+        console.log("✅ Socket.IO połączony:", socket.id);
+      });
 
-      if (data.mode === "day" || data.mode === "night") {
-        document.getElementById("aktualny_tryb").textContent = data.mode === "day" ? "Dzień" : "Noc";
-        const impActionStatusRow = document.getElementById("impActionStatusRow");
-        if (impActionStatusRow) {
-          impActionStatusRow.style.display = data.mode === "night" ? "table-row" : "none";
-        }
-      }
+      socket.on("disconnect", () => {
+        console.warn("⚠️ Socket.IO rozłączony");
+      });
 
-      if (typeof data.night_actions_pending !== "undefined") {
-        const impActionStatus = document.getElementById("imp_action_status");
-        if (impActionStatus) {
-          impActionStatus.textContent = data.night_actions_pending ? "Jeszcze się zastanawia" : "Wykonana";
-        }
-      }
+      socket.on("connect_error", (err) => {
+        console.error("❌ Błąd połączenia Socket.IO:", err);
+      });
 
-      if (typeof data.char_presented !== "undefined") {
-        const openPlayerPanelBtn = document.getElementById("openPlayerPanelBtn");
-        if (openPlayerPanelBtn) {
-          openPlayerPanelBtn.style.display = data.char_presented ? "block" : "none";
-        }
-      }
-    }
-
-    if (window.socket) {
-      window.socket.on("update_game_status", data => {
+      socket.on("update_game_status", data => {
+        console.log("📡 update_game_status:", data);
         applyGameStatus(data);
       });
+
+      return socket;
+
+    } catch (e) {
+      console.error("❌ Socket.IO init error:", e);
+      showBrowserWarning();
+      return null;
+    }
+  }
+
+  function showBrowserWarning() {
+    const errorMsg = document.getElementById("errorMsg");
+    if (errorMsg) {
+      errorMsg.textContent =
+        "Twoja przeglądarka nie wspiera Socket.IO. Dane będą aktualizowane wolniej.";
+    }
+  }
+
+  /**********************
+   * FALLBACK POLLING
+   **********************/
+  async function pollGameStatus() {
+    try {
+      const response = await fetch("/game-status", {
+        method: "GET",
+        cache: "no-store"
+      });
+
+      if (!response.ok) return;
+
+      const data = await response.json();
+      applyGameStatus(data);
+
+    } catch (err) {
+      console.warn("Polling error:", err);
+    }
+  }
+
+  /**********************
+   * UPDATE UI
+   **********************/
+  function applyGameStatus(data) {
+
+    if ("no_of_players" in data) {
+      document.getElementById("liczba_graczy").textContent = data.no_of_players;
     }
 
-    async function pollGameStatus() {
-      try {
-        const response = await fetch("/game-status", {
-          method: "GET",
-          cache: "no-store"
-        });
+    if ("char_presented" in data) {
+      document.getElementById("postacie_wylosowane").textContent =
+        data.char_presented ? "TAK" : "NIE";
 
-        if (!response.ok) {
-          return;
-        }
+      const btn = document.getElementById("openPlayerPanelBtn");
+      if (btn) btn.style.display = data.char_presented ? "block" : "none";
+    }
 
-        const data = await response.json();
-        applyGameStatus(data);
-      } catch (err) {
-        console.warn("Polling game-status nie powiodl sie:", err);
+    if (data.mode) {
+      document.getElementById("aktualny_tryb").textContent =
+        data.mode === "day" ? "Dzień" : "Noc";
+
+      const row = document.getElementById("impActionStatusRow");
+      if (row) {
+        row.style.display = data.mode === "night" ? "table-row" : "none";
       }
     }
 
+    if ("night_actions_pending" in data) {
+      const el = document.getElementById("imp_action_status");
+      if (el) {
+        el.textContent = data.night_actions_pending
+          ? "Jeszcze się zastanawia"
+          : "Wykonana";
+      }
+    }
+  }
+
+  /**********************
+   * ACTIONS
+   **********************/
+  async function setGameMode(mode) {
+    try {
+      await fetch("/game-mode", {
+        method: "POST",
+        headers: {"Content-Type": "application/x-www-form-urlencoded"},
+        body: new URLSearchParams({mode})
+      });
+    } catch (e) {
+      console.error(e);
+    }
+  }
+
+  async function showCharacters() {
+    try {
+      await fetch("/create", {
+        method: "POST",
+        headers: {"Content-Type": "application/x-www-form-urlencoded"},
+        body: new URLSearchParams({event: "show"})
+      });
+
+      window.location.href = `/player_page?t=${Date.now()}`;
+
+    } catch (e) {
+      console.error(e);
+    }
+  }
+
+  /**********************
+   * TAP HANDLER
+   **********************/
+  function bindTap(el, fn) {
+    if (!el) return;
+
+    el.addEventListener("click", fn);
+    el.addEventListener("touchend", fn, {passive: true});
+  }
+
+  /**********************
+   * INIT
+   **********************/
+  document.addEventListener("DOMContentLoaded", () => {
+
+    window.socket = initSocket();
+
+    // fallback jeśli socket nie działa
     pollGameStatus();
-    setInterval(pollGameStatus, 1500);
+    setInterval(pollGameStatus, 2000);
 
-    async function createGame() {
-      const errorMsg = document.getElementById("errorMsg");
-      errorMsg.textContent = "";
+    bindTap(document.getElementById("showCharactersRow"), showCharacters);
+    bindTap(document.getElementById("dayModeRow"), () => setGameMode("day"));
+    bindTap(document.getElementById("nightModeRow"), () => setGameMode("night"));
 
-      try {
-        const response = await fetch("/create", {
-          method: "POST",
-          headers: { "Content-Type": "application/x-www-form-urlencoded" },
-          body: new URLSearchParams({event: "create"})
-        });
-
-        if (!response.ok) {
-          const res = await response.json();
-          errorMsg.textContent = res.error || "Nie udało się utworzyć pokoju.";
-          return;
-        }
-
-        if (response.redirected) {
-          window.location.href = response.url;
-        }
-      } catch (err) {
-        console.error(err);
-        errorMsg.textContent = "Błąd połączenia z serwerem.";
-      }
+    const btn = document.getElementById("openPlayerPanelBtn");
+    if (btn) {
+      bindTap(btn, () => {
+        window.location.href = btn.dataset.href;
+      });
     }
 
-    async function showCharacters() {
-      const errorMsg = document.getElementById("errorMsg");
-      errorMsg.textContent = "";
-      const data = { event: "show" };
+  });
 
-      try {
-        const response = await fetch("/create", {
-          method: "POST",
-          headers: { "Content-Type": "application/x-www-form-urlencoded" },
-          body: new URLSearchParams(data)
-        });
+</script>
 
-        if (!response.ok) {
-          const res = await response.json();
-          errorMsg.textContent = res.error || "Nie udało się rozdzielić postaci.";
-          return;
-        }
-
-        window.location.href = `/player_page?t=${Date.now()}`;
-      } catch (err) {
-        console.error(err);
-        errorMsg.textContent = "Błąd połączenia z serwerem.";
-      }
-    }
-
-    async function setGameMode(mode) {
-      const errorMsg = document.getElementById("errorMsg");
-      errorMsg.textContent = "";
-
-      try {
-        const response = await fetch("/game-mode", {
-          method: "POST",
-          headers: { "Content-Type": "application/x-www-form-urlencoded" },
-          body: new URLSearchParams({ mode })
-        });
-
-        if (!response.ok) {
-          const res = await response.json();
-          errorMsg.textContent = res.error || "Nie udało się zmienić trybu gry.";
-          return;
-        }
-      } catch (err) {
-        console.error(err);
-        errorMsg.textContent = "Błąd połączenia z serwerem.";
-      }
-    }
-
-    const showCharactersRow = document.getElementById("showCharactersRow");
-    const dayModeRow = document.getElementById("dayModeRow");
-    const nightModeRow = document.getElementById("nightModeRow");
-    const openPlayerPanelBtn = document.getElementById("openPlayerPanelBtn");
-
-    bindTap(showCharactersRow, showCharacters);
-    bindTap(dayModeRow, () => setGameMode("day"));
-    bindTap(nightModeRow, () => setGameMode("night"));
-    bindTap(openPlayerPanelBtn, () => {
-      window.location.href = openPlayerPanelBtn.dataset.href;
-    });
-  </script>
 {% endblock %}

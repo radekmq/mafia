@@ -3,17 +3,18 @@
 <head>
   <meta charset="UTF-8">
   <title>{% block title %}{% endblock %}</title>
-  <!-- Import eleganckiej czcionki z Google Fonts -->
+
+  <!-- Czcionka -->
   <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@400;500;600&display=swap" rel="stylesheet">
 
   <style>
     body {
       font-family: "Cormorant Garamond", serif;
-      background-color: #f2e9da; /* beżowo-piaskowe tło */
-      color: #4b3a2a; /* ciepły ciemny brąz */
+      background-color: #f2e9da;
+      color: #4b3a2a;
       margin: 40px;
       line-height: 1.8;
-      font-size: 26px; /* większa czcionka */
+      font-size: 26px;
     }
 
     h1, h2, h3 {
@@ -22,15 +23,8 @@
       letter-spacing: 0.5px;
     }
 
-    h1 {
-      font-size: 2.4em;
-      margin-bottom: 0.4em;
-    }
-
-    h2 {
-      font-size: 1.8em;
-      margin-top: 1.2em;
-    }
+    h1 { font-size: 2.4em; margin-bottom: 0.4em; }
+    h2 { font-size: 1.8em; margin-top: 1.2em; }
 
     p {
       max-width: 850px;
@@ -38,7 +32,6 @@
       text-align: justify;
     }
 
-    /* Tabela */
     table {
       border-collapse: collapse;
       width: 85%;
@@ -60,15 +53,9 @@
       font-weight: 600;
     }
 
-    tr:nth-child(even) {
-      background-color: #faf8f3;
-    }
+    tr:nth-child(even) { background-color: #faf8f3; }
+    tr:hover { background-color: #efe9dc; }
 
-    tr:hover {
-      background-color: #efe9dc;
-    }
-
-    /* Linki */
     a {
       color: #7b5e35;
       text-decoration: none;
@@ -80,7 +67,6 @@
       color: #9a7448;
     }
 
-    /* Cytaty */
     blockquote {
       background: #f8f5ee;
       border-left: 5px solid #c8b89a;
@@ -92,7 +78,6 @@
       font-size: 1.1em;
     }
 
-    /* Kontener */
     .container {
       max-width: 1000px;
       margin: 0 auto;
@@ -102,7 +87,6 @@
       box-shadow: 0 2px 10px rgba(0,0,0,0.1);
     }
 
-    /* Pola input – większe, stylizowane */
     input[type="text"], input[type="number"], input[type="password"], textarea, select {
       width: 90%;
       max-width: 600px;
@@ -118,24 +102,6 @@
       box-shadow: inset 0 1px 3px rgba(0,0,0,0.1);
     }
 
-    input[type="number"] {
-      appearance: textfield;
-      -moz-appearance: textfield;
-    }
-
-    input[type="number"]::-webkit-outer-spin-button,
-    input[type="number"]::-webkit-inner-spin-button {
-      -webkit-appearance: none;
-      margin: 0;
-    }
-
-    input[type="text"]:focus, input[type="number"]:focus, input[type="password"]:focus, textarea:focus, select:focus {
-      outline: none;
-      border-color: #b49772;
-      background-color: #fffdf8;
-    }
-
-    /* 🌿 Stylizowany przycisk */
     button {
       display: block;
       margin: 25px auto;
@@ -146,61 +112,67 @@
       background: linear-gradient(180deg, #f4e7c6 0%, #e3d2a8 100%);
       border: 1px solid #b89d6b;
       border-radius: 8px;
-      box-shadow: 0 3px 6px rgba(0,0,0,0.15);
       cursor: pointer;
-      transition: all 0.2s ease-in-out;
-      touch-action: manipulation;
-      -webkit-tap-highlight-color: transparent;
-    }
-
-    button:hover {
-      background: linear-gradient(180deg, #f6ebc8 0%, #e9d9af 100%);
-      transform: translateY(-1px);
-      box-shadow: 0 4px 8px rgba(0,0,0,0.2);
-    }
-
-    button:active {
-      background: linear-gradient(180deg, #e8d9b4 0%, #d8c593 100%);
-      transform: translateY(1px);
-      box-shadow: inset 0 2px 4px rgba(0,0,0,0.2);
-    }
-
-    /* Responsywność — dla telefonów */
-    @media (max-width: 600px) {
-      body {
-        margin: 10px;
-        font-size: 19px;
-        line-height: 1.9;
-      }
-
-      .container {
-        padding: 15px;
-      }
-
-      table {
-        width: 100%;
-        font-size: 15px;
-      }
-
-      th, td {
-        padding: 8px;
-      }
-
-      blockquote {
-        width: 95%;
-        padding: 12px 18px;
-        font-size: 1.05em;
-      }
-
-      input[type="text"], input[type="number"], input[type="password"], textarea, select {
-        font-size: 19px;
-        padding: 16px;
-        width: 100%;
-      }
     }
   </style>
+
+  <!-- Socket.IO -->
   <script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
+
   <script>
+    function initSocketWithRetry() {
+      if (typeof io === "undefined") {
+        console.warn("Socket.IO jeszcze nie gotowy – retry...");
+        setTimeout(initSocketWithRetry, 200);
+        return;
+      }
+
+      try {
+        const socketUrl = window.location.origin;
+
+        window.socket = io(socketUrl, {
+          transports: ["websocket", "polling"]
+        });
+
+        const socket = window.socket;
+
+        socket.on("connect", () => {
+          console.log("Połączono z serwerem:", socket.id);
+
+          if (window.clientId) {
+            socket.emit("client_id_response", { client_id: window.clientId });
+          }
+        });
+
+        socket.on("redirect_user", data => {
+          window.location.href = data.url;
+        });
+
+        socket.on("redirect_user_for_clients", data => {
+          const targetClientIds = data && Array.isArray(data.target_client_ids)
+            ? data.target_client_ids
+            : [];
+
+          if (window.clientId && targetClientIds.includes(window.clientId)) {
+            window.location.href = data.url;
+          }
+        });
+
+        socket.on("disconnect", () => {
+          console.warn("Rozłączono z serwerem");
+        });
+
+        socket.on("game_over", data => {
+          alert(data?.message || "Koniec gry.");
+          window.location.href = "/menu-koniec-gry";
+        });
+
+      } catch (err) {
+        console.error("Błąd inicjalizacji socket:", err);
+      }
+    }
+
+    // ===== CLIENT ID =====
     function generateUUID() {
       if (window.crypto && crypto.randomUUID) {
         return crypto.randomUUID();
@@ -214,8 +186,9 @@
 
     let clientId = localStorage.getItem("client_id");
 
-    const queryParams = new URLSearchParams(window.location.search);
-    const queryClientId = queryParams.get("client_id") || queryParams.get("clientId");
+    const params = new URLSearchParams(window.location.search);
+    const queryClientId = params.get("client_id") || params.get("clientId");
+
     if (queryClientId) {
       clientId = queryClientId;
       localStorage.setItem("client_id", clientId);
@@ -225,105 +198,22 @@
       clientId = generateUUID();
       localStorage.setItem("client_id", clientId);
     }
+
     window.clientId = clientId;
 
-    const socketUrl = window.location.origin;
-
     function withClientId(url) {
-      if (!window.clientId) {
-        return url;
-      }
-
-      const separator = url.includes("?") ? "&" : "?";
-      return `${url}${separator}client_id=${encodeURIComponent(window.clientId)}`;
+      const sep = url.includes("?") ? "&" : "?";
+      return `${url}${sep}client_id=${encodeURIComponent(window.clientId)}`;
     }
 
-    let socket = null;
-    if (typeof io === "function") {
-      // Lacz sie z tym samym adresem, z ktorego zostala otwarta aplikacja.
-      socket = io(socketUrl, {
-        transports: ["websocket", "polling"]
-      });
-      window.socket = socket;
+    // ===== START =====
+    document.addEventListener("DOMContentLoaded", () => {
+      initSocketWithRetry();
+    });
 
-      socket.on("connect", () => {
-        console.log("Połączono z serwerem:", socket.id);
-        socket.emit("client_id_response", { client_id: clientId });
-      });
-
-      socket.on("redirect_user", data => {
-        window.location.href = withClientId(data.url);
-      });
-
-      socket.on("redirect_user_for_clients", data => {
-        const targetClientIds = data && Array.isArray(data.target_client_ids)
-          ? data.target_client_ids
-          : [];
-
-        if (window.clientId && targetClientIds.includes(window.clientId)) {
-          window.location.href = withClientId(data.url);
-        }
-      });
-
-      socket.on("disconnect", () => {
-        console.warn("Rozłączono z serwerem");
-      });
-
-      socket.on("game_over", data => {
-        const message = (data && data.message) ? data.message : "Koniec gry.";
-        alert(message);
-        window.location.href = withClientId("/menu-koniec-gry");
-      });
-    } else {
-      console.warn("socket.io nie jest dostępny - przejście na fallback HTTP");
-      window.socket = null;
-    }
-
-    const executionVoteFallbackPaths = [
-      "/player_page",
-      "/nomination",
-      "/truciciel-akcja",
-      "/wiki",
-    ];
-
-    async function checkExecutionVoteFallback() {
-      try {
-        const response = await fetch(`/game-status?t=${Date.now()}`, {
-          method: "GET",
-          cache: "no-store",
-        });
-
-        if (!response.ok) {
-          return;
-        }
-
-        const data = await response.json();
-        const currentPath = window.location.pathname || "";
-        const onSupportedPage = executionVoteFallbackPaths.some(path => currentPath.startsWith(path));
-
-        if (data && data.winner && !currentPath.startsWith("/menu-koniec-gry")) {
-          window.location.href = withClientId("/menu-koniec-gry");
-          return;
-        }
-
-        if (data && data.is_player && data.execution_vote_active && onSupportedPage && !currentPath.startsWith("/execution-vote")) {
-          window.location.href = withClientId(`/execution-vote?t=${Date.now()}`);
-        }
-      } catch (err) {
-        console.warn("Fallback execution vote check failed:", err);
-      }
-    }
-
-    checkExecutionVoteFallback();
-    setInterval(checkExecutionVoteFallback, 1200);
-
-    if (socket) {
-      socket.on("connect", () => {
-        checkExecutionVoteFallback();
-      });
-    }
   </script>
 </head>
+
 <body>
   {% block content %}{% endblock %}
 </body>

@@ -1,5 +1,6 @@
-﻿{% extends "base.html" %}
+{% extends "base.html" %}
 {% block title %}Twoja postac - Jasnowidz{% endblock %}
+
 {% block content %}
 <div class="container" style="overflow-x:auto;">
   <h3 style="text-align: center; margin-top: 0;">Twoja postac: {{ role_name }}</h3>
@@ -13,44 +14,68 @@
       </td>
       <td data-key="player_info" style="width:70%; vertical-align:top; white-space: pre-line;">{{ player_info }}</td>
     </tr>
+
     <tr>
       <td>Status gracza:</td>
-      <td>{{ "Martwy" if is_executed else "zywy" }}</td>
+      <td>{{ "Martwy" if is_executed else "Żywy" }}</td>
     </tr>
+
     <tr>
       <td>Tryb gry:</td>
-      <td>{{ "Dzien" if current_mode == "day" else "Noc" }} (dzien {{ day_number }})</td>
+      <td>{{ "Dzień" if current_mode == "day" else "Noc" }}</td>
     </tr>
+
     <tr>
-      <td colspan="2" data-key="player_status" style="white-space: pre-line;">{{ player_status }}</td>
+      <td colspan="2" data-key="player_status" style="white-space: pre-line;">
+        {{ player_status }}
+      </td>
     </tr>
+
     {% if is_minion and current_mode == "night" %}
     <tr>
-      <td colspan="2" style="white-space: pre-line;">{{ minion_night_status }}</td>
+      <td colspan="2" style="white-space: pre-line;">
+        {{ minion_night_status }}
+      </td>
     </tr>
     {% endif %}
   </table>
 
   <div style="margin-top: 14px; display: flex; gap: 10px; flex-wrap: wrap; justify-content: center;">
     {% if is_imp %}
-    <button id="impOpenActionBtn" type="button" {% if imp_action_done_night or is_executed or current_mode != "night" %}disabled{% endif %}>Akcja Impa</button>
+    <button id="impOpenActionBtn" type="button"
+      {% if imp_action_done_night or is_executed or current_mode != "night" %}disabled{% endif %}>
+      Akcja Impa
+    </button>
     {% endif %}
 
     {% if is_truciciel %}
-    <button id="trucicielOpenBtnNight" type="button" {% if truciciel_action_done_night or is_executed or current_mode != "night" %}disabled{% endif %}>Akcja Truciciela</button>
+    <button id="trucicielOpenBtnNight" type="button"
+      {% if truciciel_action_done_night or is_executed or current_mode != "night" %}disabled{% endif %}>
+      Akcja Truciciela
+    </button>
     {% endif %}
 
     {% if is_jasnowidz %}
-    <button id="jasnowidzOpenBtn" type="button" {% if jasnowidz_used_today or is_executed or current_mode != "day" %}disabled{% endif %}>Akcja Jasnowidza</button>
+    <button id="jasnowidzOpenBtn" type="button"
+      {% if jasnowidz_used_today or is_executed or current_mode != "day" %}disabled{% endif %}>
+      Akcja Jasnowidza
+    </button>
     {% endif %}
-
-    <button id="backHubBtn" type="button">Wroc do panelu gracza</button>
   </div>
 </div>
+<br/>
+{% include "admin_page.html" %}
 
-<script id="roleStateData" type="application/json">{{ {"clientId": client_id} | tojson }}</script>
+<script id="roleStateData" type="application/json">
+  {{ {"clientId": client_id} | tojson }}
+</script>
+
 <script>
-  const roleStateData = JSON.parse(document.getElementById("roleStateData").textContent);
+  const roleStateData = JSON.parse(document.getElementById("roleStateData").textContent || "{}");
+
+  function getSocket() {
+    return window.socket || null;
+  }
 
   function refreshRolePage() {
     window.location.href = `/moja-postac?t=${Date.now()}`;
@@ -63,13 +88,14 @@
   async function checkRoleStatus() {
     try {
       const response = await fetch("/game-status", { cache: "no-store" });
-      if (!response.ok) {
-        return;
-      }
+      if (!response.ok) return;
+
       const data = await response.json();
 
       if (data.execution_vote_active) {
-        window.location.href = `/execution-vote?t=${Date.now()}&client_id=${encodeURIComponent(roleStateData.clientId || "")}`;
+        const cid = roleStateData?.clientId || window.clientId || "";
+        window.location.href =
+          `/execution-vote?t=${Date.now()}&client_id=${encodeURIComponent(cid)}`;
         return;
       }
 
@@ -77,47 +103,49 @@
         goToPlayerHub();
         return;
       }
+
+      if (typeof window.updateAdminPanelFromStatus === "function") {
+        window.updateAdminPanelFromStatus(data);
+      }
+
     } catch (err) {
       console.warn("Role status check failed:", err);
     }
   }
 
-  const impOpenActionBtn = document.getElementById("impOpenActionBtn");
-  if (impOpenActionBtn) {
-    impOpenActionBtn.addEventListener("click", () => {
-      window.location.href = "/imp-akcja";
-    });
+  function attachSocketEvents() {
+    const socket = getSocket();
+
+    if (!socket) {
+      setTimeout(attachSocketEvents, 200);
+      return;
+    }
+
+    socket.on("update_game_status", checkRoleStatus);
+    socket.on("force_player_page_refresh", refreshRolePage);
   }
 
-  const trucicielOpenBtnNight = document.getElementById("trucicielOpenBtnNight");
-  if (trucicielOpenBtnNight) {
-    trucicielOpenBtnNight.addEventListener("click", () => {
-      window.location.href = "/truciciel-akcja";
-    });
-  }
+  // ===== BUTTONY =====
+  document.getElementById("impOpenActionBtn")?.addEventListener("click", () => {
+    window.location.href = "/imp-akcja";
+  });
 
-  const jasnowidzOpenBtn = document.getElementById("jasnowidzOpenBtn");
-  if (jasnowidzOpenBtn) {
-    jasnowidzOpenBtn.addEventListener("click", () => {
-      window.location.href = "/jasnowidz-akcja";
-    });
-  }
+  document.getElementById("trucicielOpenBtnNight")?.addEventListener("click", () => {
+    window.location.href = "/truciciel-akcja";
+  });
 
-  const backHubBtn = document.getElementById("backHubBtn");
-  if (backHubBtn) {
-    backHubBtn.addEventListener("click", goToPlayerHub);
-  }
+  document.getElementById("jasnowidzOpenBtn")?.addEventListener("click", () => {
+    window.location.href = "/jasnowidz-akcja";
+  });
 
-  socket.on("update_game_status", () => {
+  document.getElementById("backHubBtn")?.addEventListener("click", goToPlayerHub);
+
+  // ===== START =====
+  document.addEventListener("DOMContentLoaded", () => {
+    attachSocketEvents();
     checkRoleStatus();
+    setInterval(checkRoleStatus, 1000);
   });
-
-  socket.on("force_player_page_refresh", () => {
-    refreshRolePage();
-  });
-
-  checkRoleStatus();
-  setInterval(checkRoleStatus, 1000);
 </script>
-{% endblock %}
 
+{% endblock %}

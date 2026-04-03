@@ -424,6 +424,10 @@ def evaluate_and_finalize_game_if_needed():
     if db_game.get("winner"):
         return True
 
+    # Nie koncz gry, dopoki postacie nie zostaly rozlosowane.
+    if not db_game.get("char_presented") or not db_game_selection:
+        return False
+
     imp_client_id = get_current_imp_client_id()
     if imp_client_id:
         ensure_player_flags(db_players[imp_client_id])
@@ -1755,6 +1759,11 @@ def player_character_page():
         truciciel_action_done_night=db_game.get("truciciel_action_done_night", False),
         minion_night_status=minion_night_status,
         imp_action_done_night=db_game.get("imp_action_done_night", False),
+        minion_action_done_night=db_game.get("truciciel_action_done_night", False),
+        character_pages_visible=db_game.get("character_pages_visible", False),
+        is_admin=client_id == db_game.get("admin_id"),
+        liczba_graczy=len(db_players),
+        char_presented=db_game.get("char_presented", False),
     )
 
 

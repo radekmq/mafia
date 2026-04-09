@@ -127,7 +127,8 @@ DB_CHARACTERS = {
         name="Grabarz",
         role_type=RoleType.TOWNSFOLK,
         ability=Ability(
-            description="Każdej nocy dowiadujesz się, jaka postać została dziś stracona.",
+            description="Każdej nocy dowiadujesz się, jaka postać została dziś stracona."
+            "Grabarz dowiaduje się kogo stracono w ciągu dnia.",
             effect=fun_grabarz,
         ),
         image_path="grabarz.png",

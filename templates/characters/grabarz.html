@@ -1,14 +1,15 @@
 {% extends "base.html" %}
 
-{% block title %}Blood on the clocktower – Grabarz{% endblock %}
+{% block title %}Grabarz{% endblock %}
 
 {% block content %}
 
 <div style="overflow-x:auto;" class="container">
   <h3>Grabarz</h3>
 
-  <button type="button" onclick="window.location.href='{{ back_url }}'">Wróć do poprzedniego okna</button>
-  
+  <button type="button" onclick="window.location.href='{{ back_url }}'">Wróć do listy postaci</button>
+  <button type="button" onclick="window.location.href='/lobby'">Wróć do gry</button>
+
   <table>
     <tr><td style="text-align: center;">
       <img style="width: 40%; height: auto;" src="{{ url_for('static', filename='images/grabarz.png') }}">
@@ -32,7 +33,7 @@
   <blockquote>Pijak, który myśli, że jest Dziewicą, zostaje dziś stracony. W nocy Grabiarzowi pokazuje się żeton Pijaka, ponieważ Grabiarz poznaje prawdziwą postać gracza, a nie tę, za którą się uważa.</blockquote>
 
   <blockquote>Szpieg zostaje stracony. Dwóch Wędrowców zostaje wygnanych. Tej nocy Grabiarzowi pokazuje się żeton Lokaja, ponieważ Szpieg jest wykrywany jako Lokaj, a wygnania nie są egzekucjami.</blockquote>
-  
+
   <blockquote>Nikt nie został dziś stracony. Po tej nocy Grabiarz nie otrzymuje żadnej informacji.</blockquote>
 
 </div>

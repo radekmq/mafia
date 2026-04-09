@@ -16,62 +16,60 @@
     </tr>
 
     <tr>
+      <td>Imię gracza:</td>
+      <td>{{ player_name }}</td>
+    </tr>
+    <tr>
+      <td>Miejsce:</td>
+      <td>{{ player_seat_number }}</td>
+    </tr>
+    <tr>
       <td>Status gracza:</td>
       <td>{{ "Martwy" if is_executed else "Żywy" }}</td>
     </tr>
-
     <tr>
       <td>Tryb gry:</td>
       <td>{{ "Dzień" if current_mode == "day" else "Noc" }}</td>
     </tr>
-
     <tr>
-      <td colspan="2" data-key="player_status" style="white-space: pre-line;">
-        {{ player_status }}
-      </td>
+      <td>Potwierdzenie:</td>
+      <td>{{ "Potwierdzona" if action_confirmed_night else "Niepotwierdzona" }}</td>
     </tr>
-
-    {% if is_minion and current_mode == "night" %}
+    {% if current_mode == "night" %}
     <tr>
-      <td colspan="2" style="white-space: pre-line;">
-        {{ minion_night_status }}
-      </td>
+      <td colspan="2" data-key="player_status" style="white-space: pre-line;">{{ player_status }}</td>
     </tr>
     {% endif %}
   </table>
 
   <div style="margin-top: 14px; display: flex; gap: 10px; flex-wrap: wrap; justify-content: center;">
-    {% if is_imp %}
-    <button id="impOpenActionBtn" type="button"
-      {% if imp_action_done_night or is_executed or current_mode != "night" %}disabled{% endif %}>
-      Akcja Impa
-    </button>
-    {% endif %}
-
-    {% if is_truciciel %}
-    <button id="trucicielOpenBtnNight" type="button"
-      {% if truciciel_action_done_night or is_executed or current_mode != "night" %}disabled{% endif %}>
-      Akcja Truciciela
-    </button>
-    {% endif %}
-
-    {% if is_jasnowidz %}
-    <button id="jasnowidzOpenBtn" type="button"
-      {% if jasnowidz_used_today or is_executed or current_mode != "day" %}disabled{% endif %}>
+    <button id="jasnowidzOpenBtn" class="inactive-btn" type="button" style="display:none;"
+      {% if jasnowidz_used_today or is_executed %}disabled{% endif %}>
       Akcja Jasnowidza
     </button>
-    {% endif %}
   </div>
 </div>
 <br/>
+{% if jasnowidz_used_today  or is_executed%}
+{% include "player_actions/confirm_action_button.html" %}
+{% endif %}
+
 {% include "admin_page.html" %}
+
 
 <script id="roleStateData" type="application/json">
   {{ {"clientId": client_id} | tojson }}
 </script>
 
+<script id="jasnowidzViewState" type="application/json">
+  {{ {"usedToday": jasnowidz_used_today, "isExecuted": is_executed} | tojson }}
+</script>
+
 <script>
   const roleStateData = JSON.parse(document.getElementById("roleStateData").textContent || "{}");
+  const jasnowidzViewState = JSON.parse(document.getElementById("jasnowidzViewState").textContent || "{}");
+  const jasnowidzUsedToday = Boolean(jasnowidzViewState.usedToday);
+  const jasnowidzIsExecuted = Boolean(jasnowidzViewState.isExecuted);
 
   function getSocket() {
     return window.socket || null;
@@ -108,8 +106,22 @@
         window.updateAdminPanelFromStatus(data);
       }
 
+      updateJasnowidzActionButton(data);
+
     } catch (err) {
       console.warn("Role status check failed:", err);
+    }
+  }
+
+  function updateJasnowidzActionButton(data) {
+    const jasnowidzBtn = document.getElementById("jasnowidzOpenBtn");
+    if (!jasnowidzBtn || !data) return;
+
+    const canShow = data.mode === "night" && Boolean(data.truciciel_action_done_night);
+    jasnowidzBtn.style.display = canShow ? "block" : "none";
+
+    if (canShow) {
+      jasnowidzBtn.disabled = Boolean(jasnowidzUsedToday || jasnowidzIsExecuted);
     }
   }
 
@@ -144,7 +156,7 @@
   document.addEventListener("DOMContentLoaded", () => {
     attachSocketEvents();
     checkRoleStatus();
-    setInterval(checkRoleStatus, 1000);
+    setInterval(checkRoleStatus, window.APP_POLL_INTERVAL_MS);
   });
 </script>
 

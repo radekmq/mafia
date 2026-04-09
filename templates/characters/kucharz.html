@@ -1,21 +1,22 @@
 {% extends "base.html" %}
 
-{% block title %}Blood on the clocktower – Kucharz{% endblock %}
+{% block title %}Kucharz{% endblock %}
 
 {% block content %}
 
 <div style="overflow-x:auto;" class="container">
   <h3>Kucharz</h3>
 
-  <button type="button" onclick="window.location.href='{{ back_url }}'">Wróć do poprzedniego okna</button>
-  
+  <button type="button" onclick="window.location.href='{{ back_url }}'">Wróć do listy postaci</button>
+  <button type="button" onclick="window.location.href='/lobby'">Wróć do gry</button>
+
   <table>
     <tr><td style="text-align: center;">
       <img style="width: 40%; height: auto;" src="{{ url_for('static', filename='images/kucharz.png') }}">
     </td></tr>
     <tr>
       <td>
-        Na początku wiesz, ile par złych graczy siedzi obok siebie.  
+        Na początku wiesz, ile par złych graczy siedzi obok siebie.
         Kucharz wie, czy źli gracze siedzą obok siebie.
 
         <ul>
@@ -33,7 +34,7 @@
 
   <blockquote>Zły Kozioł Ofiarny siedzi pomiędzy Demonem a Minionem. Naprzeciwko, dwaj inni Minioni siedzą obok siebie. Kucharz dowiaduje się '3'.</blockquote>
 
-  <blockquote>Samotnik siedzi między Demonem a Trucicielem. Kucharz dowiaduje się '1'.  
+  <blockquote>Samotnik siedzi między Demonem a Trucicielem. Kucharz dowiaduje się '1'.
   Tutaj Samotnik rejestruje się jako zły dla pary Demon-Samotnik, ale jako dobry dla pary Truciciel-Samotnik.</blockquote>
 
 </div>

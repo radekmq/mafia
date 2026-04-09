@@ -1,0 +1,52 @@
+{% extends "base_polling.html" %}
+
+{% block title %}Tryb Nocy{% endblock %}
+
+{% block content %}
+
+  <div class="container" style="overflow-x:auto;">
+  <h3 style="text-align: center; margin-top: 0;">Twoja postac: {{ role_name }}</h3>
+
+  <table id="playerRoleTable" cellspacing="0" cellpadding="8">
+    <tr>
+      <td style="text-align:center; width:30%;">
+        <a data-key="player_link" href="wiki/{{ player_link }}">
+          <img
+            data-key="player_image"
+            style="width: 30%;
+            height: auto;
+            cursor: pointer;"
+            src="{{ url_for('static', filename='images/' ~ player_image) }}">
+        </a>
+      </td>
+      <td data-key="player_info" style="width:70%; vertical-align:top; white-space: pre-line;">{{ player_info }}</td>
+    </tr>
+    <tr>
+      <td>Imię gracza:</td>
+      <td>{{ player_name }}</td>
+    </tr>
+    <tr>
+      <td>Miejsce:</td>
+      <td>{{ player_seat }}</td>
+    </tr>
+    <tr>
+      <td>Status gracza:</td>
+      <td>{{ "Martwy" if is_executed else "Żywy" }}</td>
+    </tr>
+    <tr>
+      <td>Stan gry:</td>
+      <td>{{ current_game_state }}</td>
+    </tr>
+    <tr>
+      <td colspan="2" style="text-align: center;">
+        <button onclick="window.location.href='/wiki'">Zobacz listę postaci</button>
+        {% if is_admin %}
+        {% endif %}
+      </td>
+    </tr>
+  </table>
+</div><br/>
+
+{% endblock %}
+
+{% block scripts %}{% endblock %}

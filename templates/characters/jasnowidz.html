@@ -1,14 +1,15 @@
 {% extends "base.html" %}
 
-{% block title %}Blood on the clocktower – Jasnowidz{% endblock %}
+{% block title %}Jasnowidz{% endblock %}
 
 {% block content %}
 
 <div style="overflow-x:auto;" class="container">
   <h3>Jasnowidz</h3>
 
-  <button type="button" onclick="window.location.href='{{ back_url }}'">Wróć do poprzedniego okna</button>
-  
+  <button type="button" onclick="window.location.href='{{ back_url }}'">Wróć do listy postaci</button>
+  <button type="button" onclick="window.location.href='/lobby'">Wróć do gry</button>
+
   <table>
     <tr><td style="text-align: center;">
       <img style="width: 40%; height: auto;" src="{{ url_for('static', filename='images/jasnowidz.png') }}">
@@ -32,7 +33,7 @@
   <blockquote>Jasnowidz wybiera Impa i Empatę i otrzymuje odpowiedź „tak”.</blockquote>
 
   <blockquote>Jasnowidz wybiera żywego Lokaja i martwego Impa i otrzymuje odpowiedź „tak”.</blockquote>
-  
+
   <blockquote>Jasnowidz wybiera samego siebie oraz Świętego. Święty jest Czerwonym Śledziem. Jasnowidz otrzymuje odpowiedź „tak”.</blockquote>
 
 </div>

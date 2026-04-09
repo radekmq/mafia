@@ -7,26 +7,38 @@
   <h2>Wikipedia – Lista postaci</h2>
   <button type="button" onclick="window.location.href='{{ back_url }}'">Wróć do poprzedniego okna</button>
 
-  <table style="width:100%; border-collapse:collapse;">
+  {% set category_labels = {
+    'townsfolk': 'Mieszkańcy',
+    'outsider': 'Outsiderzy',
+    'minion': 'Minionki',
+    'demon': 'Demony'
+  } %}
+
+  <table style="width: 100%; border-collapse: collapse; margin-top: 16px;">
     {% for category, chars in characters.items() %}
       <tr>
         <td style="vertical-align: top; width: 150px; font-weight: bold; border-bottom: 1px solid #aaa;">
-          {{ category }}
+          {{ category_labels.get(category, category|capitalize) }}
         </td>
-        <td style="border-bottom: 1px solid #aaa;">
-          {% for c in chars %}
-            <a href="{{ url_for('postac', route=c.route, back=back_endpoint) }}" style="text-decoration: none; color: inherit; margin-right: 20px;">
-            <div style="display: inline-block; text-align: center; margin: 10px;">
-              <img src="{{ url_for('static', filename='images/' ~ c.file) }}" 
-                  alt="{{ c.name }}" 
-                  style="width: 100px; height: auto; border-radius: 8px;"><br>
-              {{ c.name }}
-            </div>
-          </a>
-          {% endfor %}
+        <td style="border-bottom: 1px solid #aaa; padding: 10px 0;">
+          {% if chars %}
+            {% for c in chars %}
+              <a href="{{ url_for('wiki_character', character_route=c.route) }}" style="text-decoration: none; color: inherit; margin-right: 20px;">
+                <div style="display: inline-block; text-align: center; margin: 10px; vertical-align: top;">
+                  <img src="{{ url_for('static', filename='images/' ~ c.image_path) }}"
+                      alt="{{ c.name }}"
+                      style="width: 100px; height: auto; border-radius: 8px;"><br>
+                  {{ c.name }}
+                </div>
+              </a>
+            {% endfor %}
+          {% else %}
+            <span>Brak postaci w tej kategorii.</span>
+          {% endif %}
         </td>
       </tr>
     {% endfor %}
   </table>
+
 </div>
 {% endblock %}

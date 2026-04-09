@@ -17,20 +17,30 @@
   {% if used_night %}
   <p style="font-weight: bold; text-align: center;">Akcja Impa została już wykonana tej nocy.</p>
   {% else %}
-  <form method="POST" style="margin-top: 16px;">
-    <label for="target_client_id">Wybierz gracza do wyeliminowania:</label>
-    <select id="target_client_id" name="target_client_id" required>
-      {% for player in candidates %}
-      <option value="{{ player.client_id }}">
-        {{ player.name }}{% if player.seat %} (miejsce {{ player.seat }}){% endif %} - {% if player.executed %}wyeliminowany{% else %}żywy{% endif %}
-      </option>
-      {% endfor %}
-    </select>
 
-    <button type="submit" {% if is_executed %}disabled{% endif %}>Wykonaj akcję Impa</button>
+  <form method="POST" style="margin-top: 16px;">
+    <p><strong>Wybierz gracza do wyeliminowania:</strong></p>
+
+    {% for player in candidates %}
+    <button
+      type="submit"
+      name="target_client_id"
+      value="{{ player.client_id }}"
+      style="display: block; width: 100%; margin-bottom: 8px; padding: 10px;"
+      {% if is_executed %}disabled{% endif %}
+    >
+      {{ player.name }}
+      {% if player.seat %}(miejsce {{ player.seat }}){% endif %}
+      {% if player.is_minion %} - Minionek{% endif %}
+      - {% if player.executed %}wyeliminowany{% else %}żywy{% endif %}
+    </button>
+    {% endfor %}
   </form>
+
   {% endif %}
 
-  <button type="button" onclick="window.location.href='{{ url_for('player_character_page') }}'">Wróć do strony postaci</button>
+  <form method="get" action="{{ url_for('player_character_page') }}">
+    <button type="submit">Wróć do strony postaci</button>
+  </form>
 </div>
 {% endblock %}

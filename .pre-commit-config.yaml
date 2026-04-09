@@ -1,0 +1,111 @@
+---
+exclude: ".*svg$"
+repos:
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v4.4.0
+    hooks:
+      - id: trailing-whitespace
+        stages:
+          - pre-commit
+      - id: end-of-file-fixer
+        stages:
+          - pre-commit
+      - id: mixed-line-ending
+        stages:
+          - pre-commit
+        args:
+          - --fix=lf
+      - id: no-commit-to-branch
+        stages:
+          - pre-commit
+        args:
+          - --branch=master
+          - --branch=main
+      - id: check-executables-have-shebangs
+        stages:
+          - pre-commit
+      - id: check-shebang-scripts-are-executable
+        stages:
+          - pre-commit
+      - id: check-json
+        stages:
+          - pre-commit
+      - id: pretty-format-json
+        stages:
+          - pre-commit
+        args:
+          - --autofix
+
+  - repo: https://github.com/psf/black
+    rev: 23.12.1
+    hooks:
+      - id: black
+        stages:
+          - pre-commit
+
+  - repo: https://github.com/pycqa/flake8
+    rev: 6.1.0
+    hooks:
+      - id: flake8
+        stages:
+          - pre-commit
+        additional_dependencies:
+          - flake8-docstrings==1.7.0
+          - flake8-noqa==v1.3.0
+        args:
+          - --noqa-require-code
+          - --ignore=E501,E203,W503
+
+  - repo: https://github.com/pycqa/isort
+    rev: 5.12.0
+    hooks:
+      - id: isort
+        exclude: ^utils/togg_auto_cloud
+        stages:
+          - pre-commit
+        args:
+          - --profile=black
+
+  - repo: https://github.com/charliermarsh/ruff-pre-commit
+    rev: v0.0.259
+    hooks:
+      - id: ruff
+        args:
+          - --fix
+          - --exit-non-zero-on-fix
+          - --ignore=E501
+
+  - repo: local
+    hooks:
+      - id: pylint
+        stages:
+          - pre-commit
+        name: pylint
+        entry: pylint
+        require_serial: true
+        language: system
+        types:
+          - python
+      - id: xfail
+        stages:
+          - pre-commit
+        name: Check that xfail is not used
+        entry: xfail
+        language: pygrep
+        types:
+          - python
+
+  - repo: https://github.com/jorisroovers/gitlint
+    rev: v0.19.1
+    hooks:
+      - id: gitlint
+        stages:
+          - commit-msg
+
+  - repo: https://github.com/shellcheck-py/shellcheck-py
+    rev: v0.9.0.2
+    hooks:
+      - id: shellcheck
+        args: ["-x"]
+        stages:
+          - pre-commit

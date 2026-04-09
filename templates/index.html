@@ -1,6 +1,6 @@
 {% extends "base.html" %}
 
-{% block title %}Blood on the clocktower – Strona główna{% endblock %}
+{% block title %}Rejestracja{% endblock %}
 
 {% block content %}
 
@@ -9,11 +9,11 @@
     <p>Podaj swoje imię oraz numer miejsca, aby dołączyć do gry!</p>
 
     <div style="overflow-x:auto;">
-      <p id="errorMsg" style="color: red; font-weight: bold;"></p>
+      <p id="errorMsg" style="color: red; font-weight: bold; white-space: pre-line;"></p>
       <table>
         <tr>
-          <td><label for="name">Imię:</label></td>
-          <td><input type="text" id="name" placeholder="Twoje imię" {% if name %}value="{{ name }}"{% endif %}></td>
+          <td><label for="name">Nazwa gracza:</label></td>
+          <td><input type="text" id="name" placeholder="Nazwa gracza" {% if name %}value="{{ name }}"{% endif %}></td>
         </tr>
         <tr>
           <td><label for="numer_miejsca">Numer miejsca:</label></td>
@@ -36,104 +36,94 @@
         </tr>
       </table>
     </div>
-
-    <!-- <blockquote>„Księgi są zwierciadłami duszy – im spokojniej je czytasz, tym więcej widzisz.”</blockquote> -->
   </div>
 
-  <script>
-    document.addEventListener("DOMContentLoaded", () => {
-      const inputName = document.getElementById("name");
-      const inputSeat = document.getElementById("numer_miejsca");
-      const moderatorLoginCheckbox = document.getElementById("moderator_login");
-      const moderatorPasswordRow = document.getElementById("moderatorPasswordRow");
-      const moderatorPasswordInput = document.getElementById("moderator_password");
-      const saveBtn = document.getElementById("saveBtn");
-      const errorMsg = document.getElementById("errorMsg");
+{% endblock %}
 
-      moderatorLoginCheckbox.addEventListener("change", () => {
-        const isModeratorLogin = moderatorLoginCheckbox.checked;
-        moderatorPasswordRow.style.display = isModeratorLogin ? "table-row" : "none";
-        if (!isModeratorLogin) {
-          moderatorPasswordInput.value = "";
-        }
-      });
+{% block scripts %}
 
-      const tryResumeSession = async () => {
-        const activeClientId = window.clientId || clientId;
-        if (!activeClientId) {
-          return;
-        }
+<script>
+  document.addEventListener("DOMContentLoaded", () => {
+    const moderatorCheckbox = document.getElementById("moderator_login");
+    const passwordRow = document.getElementById("moderatorPasswordRow");
+    const saveBtn = document.getElementById("saveBtn");
+    const errorMsg = document.getElementById("errorMsg");
+    localStorage.setItem("lastEventId", 0);
 
-        try {
-          const response = await fetch("/resume-session", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ clientId: activeClientId })
-          });
-
-          if (response.redirected) {
-            window.location.href = response.url;
-          }
-        } catch (err) {
-          console.warn("Auto-resume session failed:", err);
-        }
-      };
-
-      tryResumeSession();
-
-      saveBtn.addEventListener("click", async () => {
-        const name = inputName.value.trim();
-        const numerMiejsca = inputSeat.value.trim();
-        const isModeratorLogin = moderatorLoginCheckbox.checked;
-        const moderatorPassword = moderatorPasswordInput.value.trim();
-        const activeClientId = window.clientId || clientId;
-        const activeSocket = window.socket;
-        const socketSid = activeSocket && activeSocket.connected ? activeSocket.id : null;
-
-        errorMsg.textContent = "";
-
-        if (!name || !numerMiejsca) {
-          errorMsg.textContent = "Podaj imię i numer miejsca, zanim zapiszesz!";
-          return;
-        }
-
-        if (isModeratorLogin && !moderatorPassword) {
-          errorMsg.textContent = "Podaj hasło moderatora.";
-          return;
-        }
-
-        try {
-          if (activeSocket && activeSocket.connected && activeClientId) {
-            activeSocket.emit("client_id_response", { client_id: activeClientId });
-          }
-
-          const response = await fetch("/save-player", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-              name,
-              numer_miejsca: numerMiejsca,
-              moderator_login: isModeratorLogin,
-              moderator_password: moderatorPassword,
-              clientId: activeClientId,
-              socketSid: socketSid
-            })
-          });
-
-          if (!response.ok) {
-            const res = await response.json().catch(() => ({}));
-            errorMsg.textContent = res.error || "Nie udało się zapisać danych.";
-            return;
-          }
-
-          if (response.redirected) {
-            window.location.href = response.url;
-          }
-        } catch (err) {
-          console.error(err);
-          errorMsg.textContent = "Błąd połączenia z serwerem.";
-        }
-      });
+    // Pokazywanie / ukrywanie pola hasła
+    moderatorCheckbox.addEventListener("change", () => {
+      if (moderatorCheckbox.checked) {
+        passwordRow.style.display = "table-row";
+      } else {
+        passwordRow.style.display = "none";
+      }
     });
-  </script>
+
+    // Obsługa kliknięcia przycisku
+    saveBtn.addEventListener("click", async () => {
+      errorMsg.textContent = "";
+
+      const name = document.getElementById("name").value.trim();
+      const numerMiejsca = document.getElementById("numer_miejsca").value;
+      const isModerator = moderatorCheckbox.checked;
+      const password = document.getElementById("moderator_password").value;
+
+      // Walidacja
+      if (!name) {
+        errorMsg.textContent = "Podaj nazwę gracza.\n" +
+        "Nazwa gracza nie może być pusta i musi być unikalna wśród obecnych graczy.";
+        return;
+      }
+
+      if (!numerMiejsca) {
+        errorMsg.textContent =
+          "Podaj numer miejsca.\n" +
+          "Numer miejsca musi być liczbą całkowitą większą niż 0\n" +
+          "Miejsce nie może być zajęte przez innego gracza.";
+        return;
+      }
+
+      if (isModerator && !password) {
+        errorMsg.textContent = "Podaj hasło moderatora";
+        return;
+      }
+
+      try {
+        const response = await fetch("/save-player", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json"
+          },
+          body: JSON.stringify({
+            name: name,
+            numer_miejsca: parseInt(numerMiejsca),
+            moderator: isModerator,
+            password: isModerator ? password : null
+          })
+        });
+
+        const data = await response.json();
+
+        if (!response.ok) {
+          errorMsg.textContent = data.error || "Wystąpił błąd";
+          return;
+        }
+
+        // Sukces — możesz np. przekierować
+        if (data.url) {
+          localStorage.setItem("lastEventId", data.event_id);
+          window.location.href = data.url;
+        } else {
+          errorMsg.style.color = "green";
+          errorMsg.textContent = "Zapisano pomyślnie!";
+        }
+
+      } catch (err) {
+        errorMsg.textContent = "Błąd połączenia z serwerem";
+        console.error(err);
+      }
+    });
+  });
+</script>
+
 {% endblock %}

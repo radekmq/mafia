@@ -1,14 +1,15 @@
 {% extends "base.html" %}
 
-{% block title %}Blood on the clocktower – Pijak{% endblock %}
+{% block title %}Pijak{% endblock %}
 
 {% block content %}
 
 <div style="overflow-x:auto;" class="container">
   <h3>Pijak</h3>
 
-  <button type="button" onclick="window.location.href='{{ back_url }}'">Wróć do poprzedniego okna</button>
-  
+  <button type="button" onclick="window.location.href='{{ back_url }}'">Wróć do listy postaci</button>
+  <button type="button" onclick="window.location.href='/lobby'">Wróć do gry</button>
+
   <table>
     <tr><td style="text-align: center;">
       <img style="width: 40%; height: auto;" src="{{ url_for('static', filename='images/pijak.png') }}">
@@ -19,13 +20,13 @@
         Gracz będący Pijakiem uważa, że jest Townsfolkiem i nie ma pojęcia, że w rzeczywistości jest Pijakiem.
 
         <ul>
-          <li>Podczas przygotowania gry żeton Pijaka nie trafia do worka. 
-            Zamiast tego do worka trafia żeton postaci z grupy Townsfolk, a gracz, który go wylosuje, jest potajemnie Pijakiem przez całą grę. 
+          <li>Podczas przygotowania gry żeton Pijaka nie trafia do worka.
+            Zamiast tego do worka trafia żeton postaci z grupy Townsfolk, a gracz, który go wylosuje, jest potajemnie Pijakiem przez całą grę.
             Narrator (Storyteller) o tym wie. Gracz – nie.</li>
-          <li>Pijak nie ma żadnej zdolności. 
-            Gdy jego (rzekoma) zdolność Townsfolka miałaby w jakiś sposób wpłynąć na grę – nie dzieje się nic. 
-            Jednak Narrator udaje, że gracz jest postacią, za którą się uważa. 
-            Jeśli ta postać budziłaby się w nocy, Pijak również się budzi i działa tak, jakby nią był. 
+          <li>Pijak nie ma żadnej zdolności.
+            Gdy jego (rzekoma) zdolność Townsfolka miałaby w jakiś sposób wpłynąć na grę – nie dzieje się nic.
+            Jednak Narrator udaje, że gracz jest postacią, za którą się uważa.
+            Jeśli ta postać budziłaby się w nocy, Pijak również się budzi i działa tak, jakby nią był.
             Jeśli ta postać otrzymywałaby informacje, Narrator może przekazać mu fałszywe informacje – i wręcz jest do tego zachęcany.</li>
         </ul>
       </td>
@@ -38,7 +39,7 @@
 
   <blockquote>Pijak, który myśli, że jest Krukiem (Ravenkeeperem), zostaje zabity w nocy. Wybiera Świętego, ale dowiaduje się, że ta osoba jest Trucicielem.</blockquote>
 
-  <blockquote>Wróżbita (Fortune Teller) zostaje stracony. Tej nocy Pijak, który myśli, że jest Grabarzem (Undertakerem), dowiaduje się, że dzisiaj zginął Pijak.</blockquote> 
+  <blockquote>Wróżbita (Fortune Teller) zostaje stracony. Tej nocy Pijak, który myśli, że jest Grabarzem (Undertakerem), dowiaduje się, że dzisiaj zginął Pijak.</blockquote>
 </div>
 
 {% endblock %}

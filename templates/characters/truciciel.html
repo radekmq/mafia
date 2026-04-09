@@ -1,14 +1,15 @@
 {% extends "base.html" %}
 
-{% block title %}Blood on the clocktower – Truciciel{% endblock %}
+{% block title %}Truciciel{% endblock %}
 
 {% block content %}
 
 <div style="overflow-x:auto;" class="container">
   <h3>Truciciel</h3>
 
-  <button type="button" onclick="window.location.href='{{ back_url }}'">Wróć do poprzedniego okna</button>
-  
+  <button type="button" onclick="window.location.href='{{ back_url }}'">Wróć do listy postaci</button>
+  <button type="button" onclick="window.location.href='/lobby'">Wróć do gry</button>
+
   <table>
     <tr><td style="text-align: center;">
       <img style="width: 40%; height: auto;" src="{{ url_for('static', filename='images/truciciel.png') }}">
@@ -20,8 +21,8 @@
 
         <ul>
           <li>Każdej nocy Truciciel wybiera jedną osobę do zatrucia na tę noc oraz cały następny dzień.</li>
-          <li>Zatruty gracz nie ma żadnej zdolności, ale Narrator udaje, że ją ma. 
-            W rzeczywistości nie wpływa on na grę w żaden sposób. 
+          <li>Zatruty gracz nie ma żadnej zdolności, ale Narrator udaje, że ją ma.
+            W rzeczywistości nie wpływa on na grę w żaden sposób.
             Aby podtrzymać iluzję, że gracz nie jest zatruty, Narrator budzi go o odpowiedniej porze i przeprowadza jego akcję tak, jakby nie był zatruty. Jeśli jego zdolność dostarcza informacji, Narrator może przekazać mu fałszywe informacje.
           </li>
           <li>Jeśli zatruty gracz użyje zdolności „raz na grę” podczas zatrucia, nie może użyć jej ponownie.</li>
@@ -36,7 +37,7 @@
 
   <blockquote>Badacz (Investigator) jest zatruty. Otrzymuje informację, że jeden z dwóch graczy jest Baronem, mimo że żaden z nich nie jest Minionem (a nawet mogą to być zupełnie niewłaściwi gracze lub zły typ Miniona).</blockquote>
 
-  <blockquote>Grabarz (Undertaker) jest zatruty. Mimo że tego dnia zginął Imp, dowiaduje się, że zginęła Dziewica (Virgin). Kilka dni później zatruty Święty (Saint) umiera, a gra toczy się dalej.</blockquote> 
+  <blockquote>Grabarz (Undertaker) jest zatruty. Mimo że tego dnia zginął Imp, dowiaduje się, że zginęła Dziewica (Virgin). Kilka dni później zatruty Święty (Saint) umiera, a gra toczy się dalej.</blockquote>
   <blockquote>Truciciel zatruwa Burmistrza (Mayor), a następnie sam staje się Impem. Burmistrz przestaje być zatruty, ponieważ w grze nie ma już Truciciela.</blockquote>
 </div>
 

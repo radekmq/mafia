@@ -1,21 +1,22 @@
 {% extends "base.html" %}
 
-{% block title %}Blood on the clocktower – Empata{% endblock %}
+{% block title %}Empata{% endblock %}
 
 {% block content %}
 
 <div style="overflow-x:auto;" class="container">
   <h3>Empata</h3>
 
-  <button type="button" onclick="window.location.href='{{ back_url }}'">Wróć do poprzedniego okna</button>
-  
+  <button type="button" onclick="window.location.href='{{ back_url }}'">Wróć do listy postaci</button>
+  <button type="button" onclick="window.location.href='/lobby'">Wróć do gry</button>
+
   <table>
     <tr><td style="text-align: center;">
       <img style="width: 40%; height: auto;" src="{{ url_for('static', filename='images/empata.png') }}">
     </td></tr>
     <tr>
       <td>
-        Każdej nocy Empata dowiaduje się, ilu z jego dwóch żyjących sąsiadów jest złych.  
+        Każdej nocy Empata dowiaduje się, ilu z jego dwóch żyjących sąsiadów jest złych.
         Empata uczy się, czy sąsiadujący z nim gracze są dobrzy czy źli.
 
         <ul>

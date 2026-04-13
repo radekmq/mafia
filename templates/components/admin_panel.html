@@ -1,0 +1,25 @@
+{% if is_admin %}
+
+<div class="container" style="overflow-x:auto;">
+  <h3 style="text-align: center; margin-top: 0;">Panel moderatora gry</h3>
+
+  <table id="playerRoleTable" cellspacing="0" cellpadding="8">
+
+    {% if game_state == "lobby" %}
+      <td colspan="2" style="text-align: center;">
+        <button onclick="window.location.href='/start_game'">Rozpocznij grę</button>
+      </td>
+    {% endif %}
+
+    {% if game_state != "lobby" %}
+      <td colspan="2" style="text-align: center;">
+        <button onclick="window.location.href='/next_state'">Następny etap</button>
+      </td>
+    {% endif %}
+
+    </tr>
+  </table>
+</div>
+
+
+{% endif %}

@@ -1,0 +1,233 @@
+<div id="{{ id }}_wrapper" class="choice-container">
+  <p id="{{ id }}_status"></p>
+
+  <div id="{{ id }}_options" class="options"></div>
+
+  <button id="{{ id }}_confirm" type="button" class="inactive-btn" disabled>
+    Zatwierdź wybór
+  </button>
+
+  <div id="{{ id }}_success" class="success-msg">
+
+  </div>
+</div>
+
+<script>
+(function() {
+  const config = {
+    id: "{{ id }}",
+    maxSelections: {{ max_selections }},
+    options: {{ options | tojson }},
+    endpoint: "{{ endpoint }}"
+  };
+
+  let selected = [];
+
+  const container = document.getElementById(config.id + "_options");
+  const status = document.getElementById(config.id + "_status");
+  const success = document.getElementById(config.id + "_success");
+  const confirmButton = document.getElementById(config.id + "_confirm");
+  const wrapper = document.getElementById(config.id + "_wrapper");
+
+  function updateStatus() {
+    status.innerText = `Wybrane: ${selected.length} / ${config.maxSelections}`;
+  }
+
+  function updateConfirmButton() {
+    const canSubmit = selected.length === config.maxSelections;
+    confirmButton.disabled = !canSubmit;
+  }
+
+  function serializeValue(value) {
+    return JSON.stringify(value);
+  }
+
+  function normalizeOption(option) {
+    if (Array.isArray(option)) {
+      const display = option[0];
+      const value = option.length > 1 ? option[1] : option[0];
+      return {
+        display: String(display),
+        value: value
+      };
+    }
+
+    if (option && typeof option === "object") {
+      const display = option.display ?? option.label ?? option.text ?? option.name ?? option.value;
+      const value = option.value ?? option.id ?? option.key ?? option.name ?? display;
+      return {
+        display: String(display),
+        value: value
+      };
+    }
+
+    return {
+      display: String(option),
+      value: option
+    };
+  }
+
+  const normalizedOptions = (config.options || []).map(normalizeOption);
+
+  function renderOptions() {
+    container.innerHTML = "";
+
+    normalizedOptions.forEach(option => {
+      const div = document.createElement("div");
+      div.classList.add("option");
+      div.innerText = option.display;
+      div.dataset.optionKey = serializeValue(option.value);
+
+      div.onclick = () => handleClick(option.value, div);
+
+      container.appendChild(div);
+    });
+
+    updateStatus();
+  }
+
+  function handleClick(option, element) {
+    const isSelected = selected.includes(option);
+
+    if (isSelected) {
+      selected = selected.filter(o => o !== option);
+      element.classList.remove("selected");
+    } else {
+      if (selected.length >= config.maxSelections) return;
+
+      selected.push(option);
+      element.classList.add("selected");
+    }
+
+    updateStatus();
+    updateDisabled();
+    updateConfirmButton();
+  }
+
+  function updateDisabled() {
+    const allOptions = container.querySelectorAll(".option");
+
+    allOptions.forEach(el => {
+      const optionKey = el.dataset.optionKey;
+      const isSelected = selected.some(item => serializeValue(item) === optionKey);
+
+      if (!isSelected && selected.length >= config.maxSelections) {
+        el.classList.add("disabled");
+      } else {
+        el.classList.remove("disabled");
+      }
+    });
+  }
+
+  function renderSuccessMessage(message) {
+    const normalizedMessage = (message || "Wysłano wybór.").trim();
+    const lines = normalizedMessage
+      .split(/\r?\n/)
+      .map(line => line.trim())
+      .filter(Boolean);
+
+    success.innerHTML = "";
+
+    const card = document.createElement("div");
+    card.className = "success-msg__card";
+
+    const icon = document.createElement("div");
+    icon.className = "success-msg__icon";
+    icon.setAttribute("aria-hidden", "true");
+    icon.innerText = "✓";
+
+    const content = document.createElement("div");
+    content.className = "success-msg__content";
+
+    const body = document.createElement("div");
+    body.className = "success-msg__text";
+
+    if (lines.length > 1) {
+      const list = document.createElement("ul");
+      list.className = "success-msg__list";
+
+      lines.forEach(line => {
+        const item = document.createElement("li");
+        item.innerText = line;
+        list.appendChild(item);
+      });
+
+      body.appendChild(list);
+    } else {
+      const paragraph = document.createElement("p");
+      paragraph.innerText = lines[0] || "Wysłano wybór.";
+      body.appendChild(paragraph);
+    }
+
+    content.appendChild(body);
+    card.appendChild(icon);
+    card.appendChild(content);
+    success.appendChild(card);
+  }
+
+  async function sendSelection() {
+    if (selected.length !== config.maxSelections) {
+      return;
+    }
+
+    confirmButton.disabled = true;
+
+    try {
+      const response = await fetch(config.endpoint, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify({
+          selected: selected,
+          component_id: config.id
+        })
+      });
+
+      if (response.ok) {
+        let responseMessage = "";
+
+        try {
+          const contentType = response.headers.get("content-type") || "";
+
+          if (contentType.includes("application/json")) {
+            const payload = await response.json();
+            if (typeof payload === "string") {
+              responseMessage = payload;
+            } else if (payload && typeof payload === "object") {
+              responseMessage = String(
+                payload.message ?? payload.result ?? payload.status ?? ""
+              );
+            }
+          } else {
+            responseMessage = await response.text();
+          }
+        } catch (parseErr) {
+          console.warn("Nie udało się odczytać odpowiedzi:", parseErr);
+        }
+
+        renderSuccessMessage(responseMessage);
+        container.style.display = "none";
+        confirmButton.style.display = "none";
+        status.style.display = "none";
+        success.style.display = "block";
+        wrapper.classList.add("choice-container--completed");
+      } else {
+        alert("Błąd wysyłania");
+        updateConfirmButton();
+      }
+    } catch (err) {
+      console.error(err);
+      alert("Błąd połączenia");
+      updateConfirmButton();
+    }
+  }
+
+  confirmButton.onclick = sendSelection;
+
+  renderOptions();
+  updateDisabled();
+  updateConfirmButton();
+})();
+
+</script>

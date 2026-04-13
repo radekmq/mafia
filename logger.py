@@ -6,7 +6,12 @@ from logging.handlers import RotatingFileHandler
 
 from flask import has_request_context, session
 
-from database import GAME_STATE
+
+def _get_clocktower_game():
+    """Import the game singleton lazily to avoid circular imports."""
+    from state_machine import CLOCKTOWER_GAME
+
+    return CLOCKTOWER_GAME
 
 
 # Ignore logging for /api/state endpoint to reduce noise in logs
@@ -52,7 +57,11 @@ def log_info(message: str):
     else:
         client_id = None
 
-    player_name = GAME_STATE.get_player_name(client_id) if client_id else None
+    player_name = (
+        _get_clocktower_game().game_state.get_player_name(client_id)
+        if client_id
+        else None
+    )
     if player_name:
         LOGGER.info("[%s] %s", player_name, message)
     else:
@@ -66,7 +75,11 @@ def log_error(message: str):
     else:
         client_id = None
 
-    player_name = GAME_STATE.get_player_name(client_id) if client_id else None
+    player_name = (
+        _get_clocktower_game().game_state.get_player_name(client_id)
+        if client_id
+        else None
+    )
     if player_name:
         LOGGER.error("[%s] %s", player_name, message)
     else:

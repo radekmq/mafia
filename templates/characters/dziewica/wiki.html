@@ -1,0 +1,41 @@
+{% extends "base.html" %}
+
+{% block title %}Dziewica{% endblock %}
+
+{% block content %}
+
+<div style="overflow-x:auto;" class="container">
+  <h3>Dziewica</h3>
+
+  <button type="button" onclick="window.location.href='{{ back_url }}'">Wróć do listy postaci</button>
+  <button type="button" onclick="window.location.href='/lobby'">Wróć do gry</button>
+
+  <table>
+    <tr><td style="text-align: center;">
+      <img style="width: 40%; height: auto;" src="{{ url_for('static', filename='images/dziewica.png') }}">
+    </td></tr>
+    <tr>
+      <td>
+        Za pierwszym razem, gdy zostajesz nominowany, jeśli nominujący jest Mieszkańcem, zostaje natychmiast stracony.
+        Dziewica może nieumyślnie doprowadzić do egzekucji osoby, która ją oskarża, jednocześnie potwierdzając, którzy gracze są Mieszkańcami.
+
+        <ul>
+          <li>Każdej nocy, z wyjątkiem pierwszej, Dziewica może wybrać dowolnego gracza (oprócz siebie), którego chce chronić.</li>
+          <li>Jeśli Demon zaatakuje gracza chronionego przez Dziewicaa, ten gracz nie ginie. Demon nie wykonuje wtedy dodatkowego ataku — po prostu tej nocy nie ma żadnej śmierci.</li>
+          <li>Dziewica nie chroni przed egzekucją spowodowaną nominacją przez Demona.</li>
+        </ul>
+      </td>
+    </tr>
+  </table>
+
+  <blockquote>Jeśli Mieszkaniec nominuje Dziewicę, ten Mieszkaniec zostaje natychmiast stracony. Ponieważ w ciągu dnia może odbyć się tylko jedna egzekucja, proces nominacji natychmiast się kończy, nawet jeśli ktoś inny miał zaraz zginąć.</blockquote>
+
+  <blockquote>Tylko Mieszkańcy mogą zostać straceni w wyniku zdolności Dziewicy. Jeśli Dziewicę nominuje Outsider, Minion lub Demon, nic się nie dzieje i głosowanie trwa dalej.</blockquote>
+
+  <blockquote>Zdolność Dziewicy jest potężna, ponieważ jeśli Mieszkaniec ją nominuje i ginie, to obie te postacie są niemal na pewno Mieszkańcami.</blockquote>
+
+  <blockquote>Po pierwszej nominacji Dziewica traci swoją zdolność, nawet jeśli nominujący nie zginął oraz nawet jeśli Dziewica była zatruta lub pijana.</blockquote>
+
+</div>
+
+{% endblock %}

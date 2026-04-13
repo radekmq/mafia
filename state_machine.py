@@ -1,10 +1,12 @@
 """Module for handling the state machine of the Mafia game."""
 
+from flask import session, url_for
 from transitions import Machine
 
-from database import GAME_STATE
+from game_state import GameState
 from logger import log_info
 from state_machine_utils import assign_random_characters, log_players_status_table
+from utils import EventIDGenerator
 
 
 class ClocktowerGame:
@@ -16,6 +18,11 @@ class ClocktowerGame:
         self.state = "lobby"
         self.day_number = 0
         self.execution_count = 0
+        self.game_state = GameState()
+
+        # Wewnętrzna konfiguracja
+        self._page_config = {}
+        self._event_id_generator = EventIDGenerator()
 
     # =========================
     # HOOKI (ENTER)
@@ -28,25 +35,26 @@ class ClocktowerGame:
     def on_enter_players_introduction(self):
         """Handle on enter players introduction."""
         log_info("[SM on enter] Przedstawienie ról graczy")
-        GAME_STATE.game_ongoing = True
-        assign_random_characters()
-        log_players_status_table()
+        self.game_state.game_ongoing = True
+        assign_random_characters(self.game_state)
+        self.game_state.get_current_player().character.ability.setup(self)
+        log_players_status_table(self.game_state)
 
     def on_enter_night_minion_action(self):
         """Handle on enter night minion action."""
         log_info("[SM on enter] Noc – akcje złych (Imp + miniony)")
-        log_players_status_table()
+        log_players_status_table(self.game_state)
 
     def on_enter_night_all_players_action(self):
         """Handle on enter night all players action."""
         log_info("[SM on enter] Noc – akcje wszystkich postaci")
-        log_players_status_table()
+        log_players_status_table(self.game_state)
 
     def on_enter_day_discussions(self):
         """Handle on enter day discussions."""
         self.day_number += 1
         log_info(f"[SM on enter] Dzień {self.day_number} – dyskusja")
-        log_players_status_table()
+        log_players_status_table(self.game_state)
 
     def on_enter_nomination_and_voting(self):
         """Handle on enter nomination and voting."""
@@ -68,7 +76,7 @@ class ClocktowerGame:
     def on_exit_lobby(self):
         """Handle on exit lobby."""
         log_info("[SM on exit] Start gry")
-        GAME_STATE.reset_game()
+        self.game_state.reset_game()
 
     def on_exit_players_introduction(self):
         """Handle on exit players introduction."""
@@ -103,6 +111,52 @@ class ClocktowerGame:
         log_info("[SM] Sprawdzanie warunków zakończenia gry")
         return False  # Placeholder, implement actual win conditions here
 
+    def page_configuration(self):
+        """
+        Page configuration.
+
+        Funkcja śledzi zmiany w grze i aktualizuje konfigurację strony dla użytkowników.
+        Jeśli stan gry zadeklarowany w page_config się zmieni, generuje nowe event_id,
+        które może być używane do odświeżenia strony po stronie klienta.
+        Dzięki temu klient może aktualizować interfejs użytkownika odpowiednio do aktualnego stanu.
+        """
+        page_config = {
+            "url": url_for(f"state_{self.state}"),
+            "no_of_players": len(self.game_state.players),
+        }
+
+        if session.get("client_id") not in [
+            player.client_id for player in self.game_state.players
+        ]:
+            log_info(
+                "Unknown client accessing page configuration, redirecting to index."
+            )
+            page_config["url"] = url_for("index")
+
+        previous_values = (
+            {
+                key: value
+                for key, value in self._page_config.items()
+                if key != "event_id"
+            }
+            if self._page_config
+            else None
+        )
+        has_changed = not self._page_config or previous_values != page_config
+
+        if has_changed:
+            event_id = self._event_id_generator.next()
+        else:
+            event_id = self._page_config.get("event_id")
+
+        page_config["event_id"] = event_id
+        self._page_config.update(page_config)
+
+        if has_changed:
+            log_info(f"Page configuration: {page_config}")
+
+        return page_config
+
 
 # =========================
 # DEFINICJA FSM
@@ -127,13 +181,13 @@ transitions = [
         "dest": "players_introduction",
     },
     {
-        "trigger": "start_first_night",
+        "trigger": "start_evil_night_actions",
         "source": "players_introduction",
         "dest": "night_minion_action",
     },
     # NOC
     {
-        "trigger": "minions_done",
+        "trigger": "start_all_players_night_actions",
         "source": "night_minion_action",
         "dest": "night_all_players_action",
     },
@@ -175,29 +229,14 @@ transitions = [
 ]
 
 
-def get_state_description(state):
-    """Handle get state description."""
-    descriptions = {
-        "lobby": "Lobby – oczekiwanie na graczy",
-        "players_introduction": "Wprowadzenie postaci",
-        "night_minion_action": "NOC – akcje złych (Imp + miniony)",
-        "night_all_players_action": "NOC – akcje wszystkich postaci",
-        "day_discussions": "DZIEŃ – dyskusja",
-        "nomination_and_voting": "DZIEŃ - Nominacje i głosowanie",
-        "execution": "DZIEŃ - Egzekucja",
-        "game_over": "Koniec gry",
-    }
-    return descriptions[state]
-
-
 # =========================
 # INICJALIZACJA
 # =========================
 
-GAME_SM = ClocktowerGame()
+CLOCKTOWER_GAME = ClocktowerGame()
 
 STATE_MACHINE = Machine(
-    model=GAME_SM,
+    model=CLOCKTOWER_GAME,
     states=states,
     transitions=transitions,
     initial="lobby",

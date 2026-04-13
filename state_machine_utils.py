@@ -2,14 +2,16 @@
 
 import random
 
-from database import CHARACTERS_BY_TYPE, GAME_STATE, TROUBLE_BREWING_SETUP
+from characters.characters_data import CHARACTERS_BY_TYPE
+from game_setup import TROUBLE_BREWING_SETUP
+from game_state import GameState
 from logger import log_error, log_info
 
 
 # pylint: disable=too-many-locals
-def log_players_status_table():
+def log_players_status_table(game_state: GameState):
     """Handle log players status table."""
-    players = list(GAME_STATE.players)
+    players = list(game_state.players)
     if not players:
         log_info("Brak graczy do wyświetlenia w tabeli statusu.")
         return
@@ -74,9 +76,9 @@ def log_players_status_table():
 
 
 # pylint: disable=too-many-locals,too-many-statements
-def assign_random_characters():
+def assign_random_characters(game_state: GameState):
     """Handle assign random characters."""
-    player_count = len(GAME_STATE.players)
+    player_count = len(game_state.players)
     setup = next(
         (row for row in TROUBLE_BREWING_SETUP if row["gracze"] == player_count), None
     )
@@ -94,7 +96,7 @@ def assign_random_characters():
     pool_outsiders = list(CHARACTERS_BY_TYPE["outsider"])
     pool_townsfolk = list(CHARACTERS_BY_TYPE["townsfolk"])
 
-    all_players = list(GAME_STATE.players)
+    all_players = list(game_state.players)
     random.shuffle(all_players)
 
     assigned = []

@@ -6,10 +6,12 @@ from uuid import uuid4
 
 from flask import Flask, jsonify, redirect, render_template, request, session, url_for
 
-from database import CHARACTERS_BY_TYPE, DB_CHARACTERS, GAME_STATE, Player
+from characters.characters_data import CHARACTERS_BY_TYPE, DB_CHARACTERS
 from logger import IgnoreApiState, log_info
-from state_machine import GAME_SM, get_state_description
-from utils import page_configuration, require_state
+from player import Player
+from state_machine import CLOCKTOWER_GAME
+from utils import require_state, user_in_play
+from utils_render import render_day_discussion_page, render_introduction_page
 
 # Configuration
 app = Flask(__name__)
@@ -25,7 +27,7 @@ def index():
     log_info("Render index")
     # Jeżeli session ID istnieje w bazie graczy przekieruj do lobby
     if client_id and any(
-        player.client_id == client_id for player in GAME_STATE.players
+        player.client_id == client_id for player in CLOCKTOWER_GAME.game_state.players
     ):
         log_info("client_id exists, redirect to lobby.")
         return redirect(url_for("state_lobby"))
@@ -54,9 +56,13 @@ def save_player():
             jsonify({"error": "Numer miejsca musi być liczbą całkowitą większą niż 0"}),
             400,
         )
-    if numer_miejsca in [player.seat_no for player in GAME_STATE.players]:
+    if numer_miejsca in [
+        player.seat_no for player in CLOCKTOWER_GAME.game_state.players
+    ]:
         return jsonify({"error": "Miejsce jest już zajęte. Wybierz inne miejsce."}), 400
-    if name.lower() in [player.name.lower() for player in GAME_STATE.players]:
+    if name.lower() in [
+        player.name.lower() for player in CLOCKTOWER_GAME.game_state.players
+    ]:
         return (
             jsonify({"error": "Nazwa gracza jest już zajęta. Wybierz inną nazwę."}),
             400,
@@ -69,35 +75,32 @@ def save_player():
     player = Player(
         client_id=client_id, seat_no=numer_miejsca, name=name, is_admin=is_admin
     )
-    GAME_STATE.players.append(player)
+    CLOCKTOWER_GAME.game_state.players.append(player)
 
     log_info(f"Saved player: {name}, seat: {numer_miejsca}")
     if is_admin:
         log_info(f"Player {name} is admin.")
-    return page_configuration()
+    return CLOCKTOWER_GAME.page_configuration()
 
 
 @app.route("/api/state")
 def api_state():
     """Handle api state."""
-    return page_configuration()
+    return CLOCKTOWER_GAME.page_configuration()
 
 
 @app.route("/lobby")
 @require_state("lobby")
+@user_in_play
 def state_lobby():
     """Handle state lobby."""
     log_info("Render: /lobby")
     client_id = session.get("client_id")
-    player = GAME_STATE.get_player_by_client_id(client_id)
-    # Jeżeli session ID istnieje w bazie graczy przekieruj do index
-    if not (client_id and player):
-        log_info("User in lobby without client_id, redirect to index.")
-        return redirect(url_for("index"))
+    player = CLOCKTOWER_GAME.game_state.get_player_by_client_id(client_id)
 
     return render_template(
         "lobby.html",
-        no_of_players=len(GAME_STATE.players),
+        no_of_players=len(CLOCKTOWER_GAME.game_state.players),
         player_name=player.name,
         player_seat=player.seat_no,
         is_admin=player.is_admin,
@@ -109,8 +112,10 @@ def leave_game():
     """Handle leave game."""
     client_id = session.get("client_id")
     if client_id:
-        GAME_STATE.players = [
-            player for player in GAME_STATE.players if player.client_id != client_id
+        CLOCKTOWER_GAME.game_state.players = [
+            player
+            for player in CLOCKTOWER_GAME.game_state.players
+            if player.client_id != client_id
         ]
         session.pop("client_id", None)
         log_info(f"Player left the game: {client_id}")
@@ -125,7 +130,7 @@ def wiki():
 
     return render_template(
         "wiki.html",
-        back_url=url_for(f"state_{GAME_SM.state}"),
+        back_url=url_for(f"state_{CLOCKTOWER_GAME.state}"),
         characters=CHARACTERS_BY_TYPE,
     )
 
@@ -138,11 +143,12 @@ def wiki_character(character_route):
     character = next(
         (char for char in DB_CHARACTERS.values() if char.route == character_route), None
     )
+    log_info(f"Character found for route '{character_route}': {character}")
     if not character:
         return redirect(url_for("wiki"))
 
     return render_template(
-        f"characters/{character_route}.html",
+        f"characters/{character_route}/wiki.html",
         character=character,
         back_url=url_for("wiki"),
     )
@@ -157,30 +163,23 @@ def game_ongoing():
 
 @app.route("/start_game")
 @require_state("lobby")
+@user_in_play
 def start_game():
     """Handle start game."""
     # Metoda jest dynamicznie dodawana przez transitions.Machine.
     # pylint: disable=no-member
-    GAME_SM.start_introduction()
+    CLOCKTOWER_GAME.start_introduction()
     return redirect(url_for("state_players_introduction"))
 
 
 @app.route("/players_introduction")
 @require_state("players_introduction")
+@user_in_play
 def state_players_introduction():
     """Handle state players introduction."""
     log_info("Render: /players_introduction")
     client_id = session.get("client_id")
-    player = GAME_STATE.get_player_by_client_id(client_id)
-
-    if not (client_id and player):
-        if GAME_STATE.game_ongoing:
-            log_info(
-                "User in players_introduction without client_id, redirect to game_ongoing."
-            )
-            return redirect(url_for("game_ongoing"))
-        log_info("User in player_introduction without client_id, redirect to index.")
-        return redirect(url_for("index"))
+    player = CLOCKTOWER_GAME.game_state.get_player_by_client_id(client_id)
 
     if not player.character:
         log_info("Player without character in player_introduction, reject player!")
@@ -188,18 +187,86 @@ def state_players_introduction():
 
     log_info(f"Player image: {player.character.image_path}")
 
-    return render_template(
-        "player_page_night.html",
-        role_name=player.character.name,
-        player_link=player.character.route,
-        player_image=player.character.image_path,
-        player_info=player.character.ability.description,
-        player_name=player.name,
-        current_game_state=get_state_description(GAME_SM.state),
-        is_admin=player.is_admin,
-        player_seat=player.seat_no,
-        is_introduction=True,
+    return render_introduction_page(CLOCKTOWER_GAME)
+
+
+@app.route("/night_selection", methods=["POST"])
+@require_state("night_minion_action")
+@user_in_play
+def night_minion_action():
+    log_info("Render: /night_minion_action")
+    client_id = session.get("client_id")
+    CLOCKTOWER_GAME.game_state.get_player_by_client_id(client_id)
+    data = request.json
+
+    data.get("selected")
+    data.get("component_id")
+
+    ret_status = CLOCKTOWER_GAME.game_state.get_current_player().character.ability.callback_night(
+        CLOCKTOWER_GAME, data
     )
+    return ret_status, 200
+
+
+@app.route("/night_minion_action")
+@require_state("night_minion_action")
+@user_in_play
+def state_night_minion_action():
+    """Handle state night minion action."""
+    log_info("Render: /night_minion_action")
+    return CLOCKTOWER_GAME.game_state.get_current_player().character.ability.effect_night_minion(
+        CLOCKTOWER_GAME
+    )
+
+
+@app.route("/night_all_players_action")
+@require_state("night_all_players_action")
+@user_in_play
+def state_night_all_players_action():
+    """Handle state night all players action."""
+    log_info("Render: /night_all_players_action")
+    return CLOCKTOWER_GAME.game_state.get_current_player().character.ability.effect_night_all_players(
+        CLOCKTOWER_GAME
+    )
+
+
+@app.route("/day_discussions")
+@require_state("day_discussions")
+@user_in_play
+def state_day_discussions():
+    """Handle state day discussions."""
+    log_info("Render: /day_discussions")
+    return render_day_discussion_page(CLOCKTOWER_GAME)
+
+
+@app.route("/day_discussions")
+@require_state("day_discussions")
+@user_in_play
+def state_day_discussions():
+    """Handle state day discussions."""
+    log_info("Render: /day_discussions")
+    return render_day_discussion_page(CLOCKTOWER_GAME)
+
+
+@app.route("/next_state")
+@user_in_play
+def state_next_state():
+    """Handle state next state."""
+
+    if CLOCKTOWER_GAME.state == "players_introduction":
+        log_info("Transition from players_introduction to night_minion_action")
+        CLOCKTOWER_GAME.start_evil_night_actions()
+        return redirect(url_for("state_night_minion_action"))
+
+    if CLOCKTOWER_GAME.state == "night_minion_action":
+        log_info("Transition from night_minion_action to night_all_players_action")
+        CLOCKTOWER_GAME.start_all_players_night_actions()
+        return redirect(url_for("state_night_all_players_action"))
+
+    if CLOCKTOWER_GAME.state == "night_all_players_action":
+        log_info("Transition from night_all_players_action to day_discussions")
+        CLOCKTOWER_GAME.all_night_actions_done()
+        return redirect(url_for("state_day_discussions"))
 
 
 # =========================

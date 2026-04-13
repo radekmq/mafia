@@ -1,0 +1,39 @@
+{% extends "base_polling.html" %}
+
+{% block title %}Tryb Dnia{% endblock %}
+
+{% block content %}
+
+  <div class="container" style="overflow-x:auto;">
+  <table id="playerRoleTable" cellspacing="0" cellpadding="8">
+    <tr>
+      <td>Imię gracza:</td>
+      <td>{{ player_name }}</td>
+    </tr>
+    <tr>
+      <td>Miejsce:</td>
+      <td>{{ player_seat }}</td>
+    </tr>
+    <tr>
+      <td>Status gracza:</td>
+      <td>{{ "Martwy" if is_executed else "Żywy" }}</td>
+    </tr>
+    <tr>
+      <td>Stan gry:</td>
+      <td>{{ game_state_description }}</td>
+    </tr>
+    <tr>
+      <td colspan="2" style="text-align: center;">
+        <button onclick="window.location.href='/wiki'">Zobacz listę postaci</button>
+      </td>
+    </tr>
+  </table>
+</div><br/>
+{% include "components/admin_panel.html" %}
+
+{% endblock %}
+
+{% block scripts %}
+{{ super() }}
+
+{% endblock %}

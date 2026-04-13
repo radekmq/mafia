@@ -115,3 +115,146 @@ button {
   box-shadow: none;
   opacity: 1;
 }
+
+.choice-container {
+  padding: 20px;
+  background: #f8f2e6;
+  border: 1px solid #d8c8ad;
+  border-radius: 10px;
+}
+
+.choice-container .options {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  gap: 16px;
+}
+
+.choice-container .option {
+  padding: 14px;
+  border-radius: 10px;
+  border: 1px solid #ccb99a;
+  cursor: pointer;
+  background: #fffaf0;
+  transition: all 0.2s ease;
+  text-align: center;
+  font-weight: 500;
+  color: #4b3a2a;
+  box-shadow: 0 2px 5px rgba(58, 45, 31, 0.08);
+  word-wrap: break-word;
+  overflow-wrap: break-word;
+  white-space: normal;
+}
+
+.choice-container .option:hover {
+  background: #f2e6d2;
+  border-color: #b89d6b;
+  transform: translateY(-1px);
+}
+
+.choice-container .option.selected {
+  background: #e8d7b6;
+  border-color: #a98958;
+  color: #3b2a18;
+}
+
+.choice-container .option.disabled {
+  background: #ede5d6;
+  border-color: #d0c3ac;
+  color: #8a7a63;
+  opacity: 0.65;
+  cursor: not-allowed;
+}
+
+.player-status-text {
+  white-space: pre-line;
+}
+
+.choice-container h3 {
+  font-size: 26px;
+  margin-bottom: 10px;
+  font-weight: 600;
+  color: #3a2d1f;
+}
+
+.success-msg {
+  display: none;
+  margin: 22px auto 0;
+  max-width: 760px;
+  animation: successReveal 0.35s ease-out;
+}
+
+.choice-container--completed {
+  background: linear-gradient(180deg, #f9f5ec 0%, #f3ebdd 100%);
+}
+
+.success-msg__card {
+  display: flex;
+  align-items: flex-start;
+  gap: 14px;
+  padding: 18px 20px;
+  border: 1px solid #a6be90;
+  border-left: 6px solid #6e8f58;
+  border-radius: 12px;
+  background: linear-gradient(180deg, #f8fcf4 0%, #ebf4e1 100%);
+  color: #2f4a24;
+  box-shadow: 0 6px 14px rgba(45, 74, 36, 0.16);
+}
+
+.success-msg__icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 34px;
+  height: 34px;
+  flex-shrink: 0;
+  border-radius: 999px;
+  background: #6e8f58;
+  color: #f7fbed;
+  font-size: 20px;
+  font-weight: 700;
+}
+
+.success-msg__content {
+  flex: 1;
+  min-width: 0;
+}
+
+.success-msg__label {
+  margin: 0 0 6px;
+  text-align: left;
+  font-size: 1em;
+  font-weight: 700;
+  letter-spacing: 0.2px;
+}
+
+.success-msg__text {
+  text-align: left;
+  font-size: 0.93em;
+  line-height: 1.4;
+}
+
+.success-msg__text p {
+  margin: 0;
+  max-width: none;
+  text-align: left;
+}
+
+.success-msg__list {
+  margin: 0;
+  padding-left: 20px;
+}
+
+.success-msg__list li {
+  margin: 0;
+}
+
+@keyframes successReveal {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}

@@ -14,6 +14,14 @@
   <td>Stan gry:</td>
   <td>{{ game_state_description }}</td>
 </tr>
+{% if game_state == "night_all_players_action" %}
+  <tr>
+    <td>
+      Akcja potwierdzona:
+    </td>
+    <td class="player-status-text">{{ "-" if player_confirmed_action is none else "Tak" if player_confirmed_action else "trwa ..." }}</td>
+  </tr>
+{% endif %}
 {% if show_player_status %}
 <tr>
   {% set id = "players_status" %}

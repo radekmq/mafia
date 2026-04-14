@@ -1,3 +1,4 @@
+<form id="{{ id }}_form" method="post" action="{{ endpoint }}">
 <div id="{{ id }}_wrapper" class="choice-container">
   {% if title %}
   <h3>{{ title }}</h3>
@@ -15,6 +16,9 @@
 
   </div>
 </div>
+<input type="hidden" name="component_id" value="{{ id }}">
+<div id="{{ id }}_hidden_selected"></div>
+</form>
 
 <script>
 (function() {
@@ -32,6 +36,8 @@
   const success = document.getElementById(config.id + "_success");
   const confirmButton = document.getElementById(config.id + "_confirm");
   const wrapper = document.getElementById(config.id + "_wrapper");
+  const form = document.getElementById(config.id + "_form");
+  const hiddenSelectedContainer = document.getElementById(config.id + "_hidden_selected");
 
   function updateStatus() {
     status.innerText = `Wybrane: ${selected.length} / ${config.maxSelections}`;
@@ -123,108 +129,33 @@
     });
   }
 
-  function renderSuccessMessage(message) {
-    const normalizedMessage = (message || "Wysłano wybór.").trim();
-    const lines = normalizedMessage
-      .split(/\r?\n/)
-      .map(line => line.trim())
-      .filter(Boolean);
+  function buildSelectedInputs() {
+    hiddenSelectedContainer.innerHTML = "";
 
-    success.innerHTML = "";
+    selected.forEach(item => {
+      const input = document.createElement("input");
+      input.type = "hidden";
+      input.name = "selected";
+      input.value = serializeValue(item);
+      hiddenSelectedContainer.appendChild(input);
+    });
 
-    const card = document.createElement("div");
-    card.className = "success-msg__card";
-
-    const icon = document.createElement("div");
-    icon.className = "success-msg__icon";
-    icon.setAttribute("aria-hidden", "true");
-    icon.innerText = "✓";
-
-    const content = document.createElement("div");
-    content.className = "success-msg__content";
-
-    const body = document.createElement("div");
-    body.className = "success-msg__text";
-
-    if (lines.length > 1) {
-      const list = document.createElement("ul");
-      list.className = "success-msg__list";
-
-      lines.forEach(line => {
-        const item = document.createElement("li");
-        item.innerText = line;
-        list.appendChild(item);
-      });
-
-      body.appendChild(list);
-    } else {
-      const paragraph = document.createElement("p");
-      paragraph.innerText = lines[0] || "Wysłano wybór.";
-      body.appendChild(paragraph);
-    }
-
-    content.appendChild(body);
-    card.appendChild(icon);
-    card.appendChild(content);
-    success.appendChild(card);
+    const jsonInput = document.createElement("input");
+    jsonInput.type = "hidden";
+    jsonInput.name = "selected_json";
+    jsonInput.value = JSON.stringify(selected);
+    hiddenSelectedContainer.appendChild(jsonInput);
   }
 
-  async function sendSelection() {
+  function sendSelection() {
     if (selected.length !== config.maxSelections) {
       return;
     }
 
     confirmButton.disabled = true;
 
-    try {
-      const response = await fetch(config.endpoint, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json"
-        },
-        body: JSON.stringify({
-          selected: selected,
-          component_id: config.id
-        })
-      });
-
-      if (response.ok) {
-        let responseMessage = "";
-
-        try {
-          const contentType = response.headers.get("content-type") || "";
-
-          if (contentType.includes("application/json")) {
-            const payload = await response.json();
-            if (typeof payload === "string") {
-              responseMessage = payload;
-            } else if (payload && typeof payload === "object") {
-              responseMessage = String(
-                payload.message ?? payload.result ?? payload.status ?? ""
-              );
-            }
-          } else {
-            responseMessage = await response.text();
-          }
-        } catch (parseErr) {
-          console.warn("Nie udało się odczytać odpowiedzi:", parseErr);
-        }
-
-        renderSuccessMessage(responseMessage);
-        container.style.display = "none";
-        confirmButton.style.display = "none";
-        status.style.display = "none";
-        success.style.display = "block";
-        wrapper.classList.add("choice-container--completed");
-      } else {
-        alert("Błąd wysyłania");
-        updateConfirmButton();
-      }
-    } catch (err) {
-      console.error(err);
-      alert("Błąd połączenia");
-      updateConfirmButton();
-    }
+    buildSelectedInputs();
+    form.submit();
   }
 
   confirmButton.onclick = sendSelection;

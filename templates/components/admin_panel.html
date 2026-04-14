@@ -10,7 +10,12 @@
   <div id="messageBox" style="display:none; text-align:center; margin:10px 0;"></div>
 
   <table id="playerRoleTable" cellspacing="0" cellpadding="8">
-
+    {% if game_state == "night_minion_action" %}
+    <tr>
+      <td>Akcja minionów:</td>
+      <td>{{ minion_action_status }}</td>
+    </tr>
+    {% endif %}
     <tr>
       {% if game_state == "lobby" %}
       <td colspan="2" style="text-align: center;">
@@ -20,9 +25,10 @@
 
       {% if game_state != "lobby" %}
       <td colspan="2" style="text-align: center;">
-        <button onclick="nextState()">Następny etap</button>
         {% if game_state == "nomination" %}
           <button onclick="completeNomination()">Zakończ nominacje</button>
+        {% else %}
+          <button onclick="nextState()">Następny etap</button>
         {% endif %}
       </td>
       {% endif %}
@@ -126,6 +132,7 @@ function completeNomination() {
       showError("Błąd połączenia z serwerem");
     });
 }
+
 </script>
 
 {% endif %}

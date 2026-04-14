@@ -1,0 +1,9 @@
+{% if game_state == "night_all_players_action" %}
+    {% if player_confirmed_action == False %}
+    <tr>
+        <td colspan="2" style="text-align: center;">
+        <button onclick="window.location.href='/confirm_admin_action'">Potwierdź wykonanie akcji</button>
+        </td>
+    </tr>
+    {% endif %}
+{% endif %}

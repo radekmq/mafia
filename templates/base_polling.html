@@ -50,6 +50,9 @@
           if (window.onStatusUpdate) {
             window.onStatusUpdate(data);
           }
+          if (window.onAdminStatusUpdate) {
+            window.onAdminStatusUpdate(data);
+          }
 
         }
       } catch (e) {

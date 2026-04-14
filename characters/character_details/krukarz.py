@@ -1,4 +1,3 @@
-
 from characters.character import Ability, Character, RoleType
 
 

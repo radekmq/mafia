@@ -1,0 +1,24 @@
+{% extends "player_page_night.html" %}
+
+{% block title %}{{ super() }} - Imp{% endblock %}
+
+{% block content %}
+
+<div class="container" style="overflow-x:auto;">
+
+  {% set id = "vote_imp_replace" %}
+  {% set title = "Wybierz gracza, któremu chcesz przekazać rolę Demona:" %}
+  {% set options = character_data.player_list %}
+  {% set max_selections = 1 %}
+  {% set endpoint = "/night_demon_replace" %}
+  {% include "components/choice_selector.html" %}
+
+</div></br>
+
+{{ super() }}
+{% endblock %}
+
+{% block scripts %}
+{{ super() }}
+
+{% endblock %}

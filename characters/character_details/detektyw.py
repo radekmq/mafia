@@ -38,7 +38,9 @@ def ability_setup(ct_game):
     minions_in_play = [
         candidate
         for candidate in ct_game.game_state.players
-        if candidate.character and candidate.character.role_type == RoleType.MINION
+        if candidate.character
+        and candidate.character.role_type == RoleType.MINION
+        and player.client_id != candidate.client_id
     ]
 
     if minions_in_play:
@@ -47,6 +49,7 @@ def ability_setup(ct_game):
             candidate
             for candidate in ct_game.game_state.players
             if candidate.client_id != minion_player.client_id
+            and player.client_id != candidate.client_id
         ]
         shown_players = [minion_player]
         if decoy_candidates:

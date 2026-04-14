@@ -3,7 +3,6 @@
 {% block title %}{{ super() }} - Imp{% endblock %}
 
 {% block content %}
-{{ super() }}
 
 <div class="container" style="overflow-x:auto;">
 
@@ -25,7 +24,7 @@
         {% if character_data.allow_imp_night_action == True %}
 
           {% set id = "vote_imp" %}
-          {% set title = "Wybierz gracza, którego chcesz zabić:" %}
+          {% set title = "Wybierz gracza, którego chcesz wyeliminować:" %}
           {% set options = character_data.player_list %}
           {% set max_selections = 1 %}
           {% set endpoint = "/night_selection" %}
@@ -37,10 +36,15 @@
 
       </td>
     </tr>
+    {% if character_data.allow_imp_night_action == False %}
+      {% include "components/confirm_action.html" %}
+    {% endif %}
+
   </table>
 
-</div>
+</div></br>
 
+{{ super() }}
 {% endblock %}
 
 {% block scripts %}

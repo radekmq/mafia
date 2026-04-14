@@ -4,15 +4,15 @@
 
 {% block content %}
 
-  {% include "components/admin_panel.html" %}</br>
+<div class="container" style="overflow-x:auto;">
 
-  <div class="container" style="overflow-x:auto;">
-  <table id="playerRoleTable" cellspacing="0" cellpadding="8">
+  <h3>{{ executed_player_name }}</h3>
 
-    {% set show_player_status = True %}
-    {% include "components/player_panel.html" %}
-
+  <table>
+  {% set show_player_status = True %}
+  {% include "components/player_panel.html" %}
   </table>
+
 </div><br/>
 
 {% endblock %}

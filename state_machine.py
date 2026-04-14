@@ -9,6 +9,7 @@ from logger import log_info
 from player import PlayerStatus
 from state_machine_utils import assign_random_characters, log_players_status_table
 from utils import EventIDGenerator
+from voting import VotingSystem
 
 
 class ClocktowerGame:
@@ -21,6 +22,7 @@ class ClocktowerGame:
         self.day_number = 0
         self.execution_count = 0
         self.game_state = GameState()
+        self.voting_system = VotingSystem()
 
         # Wewnętrzna konfiguracja
         self._page_config = {}
@@ -40,13 +42,18 @@ class ClocktowerGame:
         self.game_state.game_ongoing = True
         assign_random_characters(self.game_state)
         for player in self.game_state.players:
-            player.character.ability.setup(self)
+            if player.character is not None:
+                player.character.ability.setup(self)
         log_players_status_table(self.game_state)
 
     def on_enter_night_minion_action(self):
         """Handle on enter night minion action."""
         log_info("[SM on enter] Noc – akcje złych (Imp + miniony)")
         log_players_status_table(self.game_state)
+        self.game_state.nominated_by_imp_to_die = None
+        self.game_state.demon_replacement_candidate = None
+        for player in self.game_state.players:
+            player.poisoned = False
 
     def on_enter_night_all_players_action(self):
         """Handle on enter night all players action."""
@@ -71,6 +78,22 @@ class ClocktowerGame:
         """Handle on enter execution."""
         self.execution_count += 1
         log_info(f"[SM on enter] Egzekucja nr {self.execution_count}")
+        player_winner = self.voting_system.get_player_with_most_votes()
+        if player_winner:
+            winner_id = player_winner.client_id
+            executed = self.game_state.get_player_by_client_id(winner_id)
+            executed.alive = PlayerStatus.DEAD
+            executed.character = None
+            log_info(f"Player executed: {executed.name} (client_id: {winner_id})")
+            self.game_state.executed_player_name = (
+                f"Tej nocy miasto wyeliminowało gracza: {executed.name}"
+            )
+        else:
+            log_info("No player was executed due to a tie or no votes.")
+            self.game_state.executed_player_name = (
+                "Tej nocy miasto nie wyeliminowało nikogo."
+            )
+        self.voting_system.reset()
 
     def on_enter_game_over(self):
         """Handle on enter game over."""
@@ -97,7 +120,9 @@ class ClocktowerGame:
         """Handle on exit night all players action."""
         log_info("[SM on exit] Wszystkie akcje nocne zakończone")
         for player in self.game_state.players:
-            player.character.ability.on_night_exit(self)
+            if player.character is not None:
+                player.character.ability.on_night_exit(self)
+            player.reset_admin_confirmation()
 
     def on_exit_day_discussions(self):
         """Handle on exit day discussions."""
@@ -110,6 +135,9 @@ class ClocktowerGame:
     def on_exit_voting(self):
         """Handle on exit voting."""
         log_info("[SM on exit] Koniec głosowania")
+        self.voting_system.push_nominee_to_list()
+        for player in self.game_state.players:
+            player.reset_vote_status()
 
     def on_exit_execution(self):
         """Handle on exit execution."""
@@ -121,15 +149,27 @@ class ClocktowerGame:
 
     def should_end_game(self):
         """Zaimplementujesz: warunki zwycięstwa (Imp vs Town)."""
+
         log_info("[SM] Sprawdzanie warunków zakończenia gry")
-        if self.game_state.nominated_by_imp_to_die is not None:
-            for player_id_to_die in self.game_state.nominated_by_imp_to_die:
-                player_to_die = self.game_state.get_player_by_client_id(
-                    player_id_to_die
+        nominated_to_die = self.game_state.nominated_by_imp_to_die
+        nominated_to_replace = self.game_state.demon_replacement_candidate
+
+        # Najpierw ustalmy, czy Imp jest martwy
+        if nominated_to_die is not None:
+            log_info(f"Players successfully killed by Imp: {nominated_to_die.name}")
+            nominated_to_die.alive = PlayerStatus.DEAD
+
+            if nominated_to_replace is not None:
+                log_info(f"Replacing Demon with: {nominated_to_replace.name}")
+                nominated_to_replace.character = nominated_to_die.character
+                nominated_to_replace.additional_characters = (
+                    nominated_to_die.additional_characters
                 )
-                player_to_die.alive = PlayerStatus.DEAD
-                log_info(f"Players successfully killed by Imp: {player_to_die.name}")
+                nominated_to_die.character = None
+                nominated_to_die.additional_characters = []
+
             self.game_state.nominated_by_imp_to_die = None
+            self.game_state.demon_replacement_candidate = None
 
         no_of_alive_players = len(
             [
@@ -141,10 +181,15 @@ class ClocktowerGame:
         log_info(f"Number of alive players: {no_of_alive_players}")
         is_demon_alive = any(
             player.alive == PlayerStatus.ALIVE
+            and player.character is not None
             and player.character.role_type == RoleType.DEMON
             for player in self.game_state.players
         )
         log_info(f"Is Demon alive: {is_demon_alive}")
+
+        # TEMP always false - DELETE when testing is done
+        return False
+
         return is_demon_alive is False or no_of_alive_players <= 2
 
     def page_configuration(self):
@@ -159,6 +204,21 @@ class ClocktowerGame:
         page_config = {
             "url": url_for(f"state_{self.state}"),
             "no_of_players": len(self.game_state.players),
+            "active_voting_player_client_id": self.voting_system.get_active_voter_client_id()
+            if self.state == "voting"
+            else None,
+            "player_vote_status": [
+                {"name": player.name, "vote_status": player.get_vote_status().value}
+                for player in self.game_state.players
+            ]
+            if self.state == "voting"
+            else None,
+            "admin_confirm_status": [
+                {"name": player.name, "confirmed": player.is_admin_action_confirmed()}
+                for player in self.game_state.players
+            ]
+            if self.state in ["night_all_players_action"]
+            else None,
         }
 
         if session.get("client_id") not in [

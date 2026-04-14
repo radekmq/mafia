@@ -38,9 +38,12 @@ def ability_setup(ct_game):
     townsfolk_in_play = [
         candidate
         for candidate in ct_game.game_state.players
-        if candidate.character
-        and candidate.character.role_type == RoleType.TOWNSFOLK
-        and candidate.character.name != "Praczka"
+        if (
+            candidate.character
+            and candidate.character.role_type == RoleType.TOWNSFOLK
+            and candidate.character.name != "Praczka"
+            and candidate.client_id != player.client_id
+        )
     ]
 
     if not townsfolk_in_play:
@@ -52,13 +55,17 @@ def ability_setup(ct_game):
         candidate
         for candidate in ct_game.game_state.players
         if candidate.client_id != townsfolk_player.client_id
+        and candidate.client_id != player.client_id
     ]
     shown_players = [townsfolk_player]
     if decoy_candidates:
         shown_players.append(random.choice(decoy_candidates))
+    else:
+        player.player_status = "Praczka nie otrzymuje informacji o Mieszczaninie."
+        return
     random.shuffle(shown_players)
 
-    shown_players_text = " lub ".join(
+    shown_players_text = "\n * " + "\n * ".join(
         f"{candidate.name} (miejsce: {candidate.seat_no})"
         for candidate in shown_players
     )

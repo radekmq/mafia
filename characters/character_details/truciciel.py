@@ -1,3 +1,5 @@
+import json
+
 from characters.character import Ability, Character, RoleType
 from logger import log_info
 from player import PlayerStatus
@@ -65,22 +67,28 @@ def ability_effect_night_minion(ct_game):
     )
 
 
-def ability_callback(ct_game, data: dict):
+def ability_callback(ct_game, data):
     """Handle callback for the Truciciel's ability."""
     log_info(f"Truciciel's ability callback called with data: {data}")
 
+    try:
+        selected_json = json.loads(data.get("selected_json", "[]"))
+    except json.JSONDecodeError:
+        selected_json = []
+
+    log_info(f"Player nominated by Truciciel to poison: {selected_json}")
+
     current_player = ct_game.game_state.get_current_player()
     current_player.night_action_done = True
-    poisoned_character = ct_game.game_state.get_player_by_client_id(
-        data.get("selected")[0]
-    )
+    poisoned_character = ct_game.game_state.get_player_by_client_id(selected_json[0])
+    poisoned_character.poisoned = True
     log_info(
-        f"Gracz wybrany do zatrucia: {poisoned_character.name if poisoned_character else 'None'}"
+        f"Gracz otruty: {poisoned_character.name if poisoned_character else 'None'}"
     )
     current_player.character.truciciel_night_status = (
-        f"\nGracz {poisoned_character.name} został wybrany do zatrucia."
+        f"\nGracz {poisoned_character.name} został otruty."
     )
-    return "Gracz: " + poisoned_character.name + " jest wybrany do zatrucia."
+    return ability_effect_night_minion(ct_game)
 
 
 def ability_setup(ct_game):

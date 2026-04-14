@@ -23,19 +23,10 @@
         <td>Twoje miejsce:</td>
         <td><p id="player_seat" style="text-align: center;">{{player_seat}}</p></td>
       </tr>
-      {% if is_admin %}
-      <tr>
-        <td>Moderator gry:</td>
-        <td><p style="text-align: center;">TAK</p></td>
-      </tr>
-      {% endif %}
       <tr>
         <td colspan="2" style="text-align: center;">
           <button onclick="window.location.href='/leave_game'">Opuść grę</button>
           <button onclick="window.location.href='/wiki'">Zobacz listę postaci</button>
-          {% if is_admin %}
-          <button onclick="window.location.href='/start_game'">Rozpocznij grę</button>
-          {% endif %}
         </td>
       </tr>
     </table>

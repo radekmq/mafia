@@ -19,6 +19,7 @@ class GameState:
         action_imp_done: bool = False,
         last_executed_player: Player | None = None,
         nominated_by_imp_to_die: Player | None = None,
+        demon_replacement_candidate: Player | None = None,
         kruk_died_last_night: bool = False,
         virgin_nomination_counter: int = 0,
         auto_game: bool = False,
@@ -37,6 +38,9 @@ class GameState:
 
         # ten atrybut określa, którego gracza Imp wybrał do zabicia w nocy.
         self.nominated_by_imp_to_die = nominated_by_imp_to_die
+
+        # określa kandydata do zastąpienia Demona
+        self.demon_replacement_candidate = demon_replacement_candidate
 
         # określa czy kruk zginął poprzedniej nocy
         self.kruk_died_last_night = kruk_died_last_night
@@ -102,5 +106,6 @@ class GameState:
         self.virgin_nomination_counter = 0
         self.alive_players_counter = 0
         self.alive_evil_players_counter = 0
+        self.demon_replacement_candidate = None
         for player in self.players:
             player.reset_status()

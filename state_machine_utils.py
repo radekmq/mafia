@@ -18,6 +18,7 @@ def log_players_status_table(game_state: GameState):
 
     headers = [
         "Nazwa gracza",
+        "Client ID",
         "Postać",
         "Dodatkowe postaci",
         "Pijany",
@@ -42,6 +43,7 @@ def log_players_status_table(game_state: GameState):
         rows.append(
             [
                 player.name,
+                player.client_id,
                 character_name,
                 additional,
                 drunk,

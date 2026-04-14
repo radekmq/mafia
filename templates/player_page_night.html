@@ -4,8 +4,29 @@
 
 {% block content %}
 
-  {% include "components/admin_panel.html" %}
-  </br>
+{% if is_admin and game_state == "night_all_players_action" %}
+<div class="container" style="overflow-x:auto;">
+  {% if game_state == "night_all_players_action" %}
+      <table id="adminStatusTable">
+        <thead>
+          <tr>
+            <th>Gracz</th>
+            <th>Status potwierdzenia</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for player in admin_confirm_status %}
+            <tr>
+              <td>{{ player.name }}</td>
+              <td>{{ "Potwierdzona" if player.confirmed else "Oczekuje" }}</td>
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+  {% endif %}
+</div></br>
+{% endif %}
+
   <div class="container" style="overflow-x:auto;">
   <h3 style="text-align: center; margin-top: 0;">Twoja postać: {{ role_name }}</h3>
 
@@ -38,5 +59,36 @@
 
 {% block scripts %}
 {{ super() }}
+
+  <script>
+
+  function updateAdminStatus(adminStatus) {
+    const tableBody = document.querySelector("#adminStatusTable tbody");
+    if (!tableBody) return;
+
+    tableBody.innerHTML = ""; // Wyczyść istniejące wiersze
+
+    adminStatus.forEach(player => {
+      const row = document.createElement("tr");
+
+      const nameCell = document.createElement("td");
+      nameCell.textContent = player.name;
+      row.appendChild(nameCell);
+
+      const statusCell = document.createElement("td");
+      statusCell.textContent = player.confirmed ? "Potwierdzona" : "Oczekuje";
+      row.appendChild(statusCell);
+
+      tableBody.appendChild(row);
+    });
+  }
+
+  window.onAdminStatusUpdate = function(data) {
+    const adminStatus = data.admin_confirm_status || [];
+
+    updateAdminStatus(adminStatus);
+  };
+
+  </script>
 
 {% endblock %}

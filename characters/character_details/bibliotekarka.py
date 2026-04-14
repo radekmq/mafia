@@ -38,7 +38,11 @@ def ability_setup(ct_game):
     outsiders_in_play = [
         candidate
         for candidate in ct_game.game_state.players
-        if candidate.character and candidate.character.role_type == RoleType.OUTSIDER
+        if (
+            candidate.character
+            and candidate.character.role_type == RoleType.OUTSIDER
+            and candidate.client_id != player.client_id
+        )
     ]
 
     if outsiders_in_play:
@@ -46,7 +50,10 @@ def ability_setup(ct_game):
         decoy_candidates = [
             candidate
             for candidate in ct_game.game_state.players
-            if candidate.client_id != outsider_player.client_id
+            if (
+                candidate.client_id != outsider_player.client_id
+                and candidate.client_id != player.client_id
+            )
         ]
         shown_players = [outsider_player]
         if decoy_candidates:

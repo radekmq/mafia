@@ -1,5 +1,6 @@
 """Module for handling the player definitions in the Mafia game."""
 
+import threading
 from enum import Enum
 
 from characters.character import Character
@@ -10,6 +11,13 @@ class PlayerStatus(Enum):
 
     ALIVE = "alive"
     DEAD = "dead"
+
+
+class PlayerVoteStatus(Enum):
+    NOT_VOTED = " - "
+    VOTED_YES = "ZAGŁOSOWAŁ TAK"
+    VOTED_NO = "WSTRZYMAŁ SIĘ OD GŁOSU"
+    NO_RIGHT_TO_VOTE = "NIE MA PRAWA GŁOSU"
 
 
 # pylint: disable=too-many-instance-attributes,too-many-arguments,too-many-positional-arguments
@@ -43,7 +51,9 @@ class Player:
 
         # Internal parameters
         self.player_status = None
+        self.vote_status = PlayerVoteStatus.NOT_VOTED
         self.night_action_done = False
+        self.lock = threading.Lock()
 
     def reset_status(self):
         """Handle reset status."""
@@ -54,3 +64,34 @@ class Player:
         self.additional_characters = []
         self.player_status = None
         self.night_action_done = False
+        self.admin_confirm_action = False
+
+    def set_vote_status(self, vote_status: PlayerVoteStatus):
+        """Set vote status."""
+        with self.lock:
+            self.vote_status = vote_status
+
+    def get_vote_status(self) -> PlayerVoteStatus:
+        """Get vote status."""
+        with self.lock:
+            return self.vote_status
+
+    def reset_vote_status(self):
+        """Reset vote status."""
+        with self.lock:
+            self.vote_status = PlayerVoteStatus.NOT_VOTED
+
+    def confirm_admin_action(self):
+        """Confirm admin action."""
+        with self.lock:
+            self.admin_confirm_action = True
+
+    def reset_admin_confirmation(self):
+        """Reset admin confirmation."""
+        with self.lock:
+            self.admin_confirm_action = False
+
+    def is_admin_action_confirmed(self) -> bool:
+        """Check if admin action is confirmed."""
+        with self.lock:
+            return self.admin_confirm_action

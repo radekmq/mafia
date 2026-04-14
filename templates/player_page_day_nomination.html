@@ -1,20 +1,37 @@
 {% extends "base_polling.html" %}
 
-{% block title %}Tryb Dnia{% endblock %}
+{% block title %}Nomination{% endblock %}
 
 {% block content %}
+<div class="container" style="overflow-x:auto;">
 
-{% include "components/admin_panel.html" %}<br/>
+  {% if players_available == False %}
+    <p style="text-align: center; font-size: 1.2em;">Brak dostępnych graczy do nominacji.</p>
+  {% else %}
+    {% set id = "nominate_to_execute" %}
+    {% set title = "Nominuj gracza do egzekucji:" %}
+    {% set options = alive_player_list %}
+    {% set max_selections = 1 %}
+    {% set endpoint = "/nominate_execute" %}
 
-  <div class="container" style="overflow-x:auto;">
-  <table id="playerRoleTable" cellspacing="0" cellpadding="8">
+    {% include "components/choice_selector.html" %} </br>
+  {% endif %}
 
-    {% set show_player_status = True %}
-    {% include "components/player_panel.html" %}
-
+  <table style="margin: 0 auto;">
+    <tr>
+      <td>
+        Nominowani gracze:
+      </td>
+      <td>Liczba głosów</td>
+    </tr>
+    {% for nominee in nominated_players %}
+    <tr>
+      <td>{{ nominee.name }}</td>
+      <td>{{ nominee.votes }}</td>
+    </tr>
+    {% endfor %}
   </table>
 </div>
-
 {% endblock %}
 
 {% block scripts %}

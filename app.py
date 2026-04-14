@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 """Flask application entrypoint for the Mafia game."""
 
+import json
 import logging
 from uuid import uuid4
 
@@ -8,13 +9,14 @@ from flask import Flask, jsonify, redirect, render_template, request, session, u
 
 from characters.characters_data import CHARACTERS_BY_TYPE, DB_CHARACTERS
 from logger import IgnoreApiState, log_info
-from player import Player
+from player import Player, PlayerStatus, PlayerVoteStatus
 from state_machine import CLOCKTOWER_GAME
 from utils import require_state, user_in_play
 from utils_render import (
     render_day_discussion_page,
     render_execution_page,
     render_game_over_page,
+    render_inactive_page,
     render_introduction_page,
     render_nomination_page,
     render_voting_page,
@@ -111,6 +113,7 @@ def state_lobby():
         player_name=player.name,
         player_seat=player.seat_no,
         is_admin=player.is_admin,
+        game_state=CLOCKTOWER_GAME.state,
     )
 
 
@@ -139,6 +142,7 @@ def wiki():
         "wiki.html",
         back_url=url_for(f"state_{CLOCKTOWER_GAME.state}"),
         characters=CHARACTERS_BY_TYPE,
+        game_state=CLOCKTOWER_GAME.state,
     )
 
 
@@ -204,17 +208,25 @@ def state_players_introduction():
 @user_in_play
 def night_selection():
     log_info("Handle: night_selection")
-    client_id = session.get("client_id")
-    CLOCKTOWER_GAME.game_state.get_player_by_client_id(client_id)
-    data = request.json
-
-    data.get("selected")
-    data.get("component_id")
 
     ret_status = CLOCKTOWER_GAME.game_state.get_current_player().character.ability.callback_night(
-        CLOCKTOWER_GAME, data
+        CLOCKTOWER_GAME, request.form
     )
-    return ret_status, 200
+
+    return ret_status
+
+
+@app.route("/night_demon_replace", methods=["POST"])
+@require_state(["night_all_players_action"])
+@user_in_play
+def night_demon_replace():
+    log_info("Handle: night_demon_replace")
+
+    ret_status = CLOCKTOWER_GAME.game_state.get_current_player().character.ability.callback_night(
+        CLOCKTOWER_GAME, request.form, replace_demon=True
+    )
+
+    return ret_status
 
 
 @app.route("/night_minion_action")
@@ -223,6 +235,11 @@ def night_selection():
 def state_night_minion_action():
     """Handle state night minion action."""
     log_info("Render: /night_minion_action")
+    if CLOCKTOWER_GAME.game_state.get_current_player().alive == PlayerStatus.DEAD:
+        log_info(
+            "Current player is dead during night_minion_action, render inactive page."
+        )
+        return render_inactive_page(CLOCKTOWER_GAME)
     return CLOCKTOWER_GAME.game_state.get_current_player().character.ability.effect_night_minion(
         CLOCKTOWER_GAME
     )
@@ -234,6 +251,11 @@ def state_night_minion_action():
 def state_night_all_players_action():
     """Handle state night all players action."""
     log_info("Render: /night_all_players_action")
+    if CLOCKTOWER_GAME.game_state.get_current_player().alive == PlayerStatus.DEAD:
+        log_info(
+            "Current player is dead during night_all_players_action, render inactive page."
+        )
+        return render_inactive_page(CLOCKTOWER_GAME)
     return CLOCKTOWER_GAME.game_state.get_current_player().character.ability.effect_night_all_players(
         CLOCKTOWER_GAME
     )
@@ -257,13 +279,42 @@ def state_nomination():
     return render_nomination_page(CLOCKTOWER_GAME)
 
 
-@app.route("/complete_nomination", methods=["POST"])
+@app.route("/nominate_execute", methods=["POST"])
+@require_state(["nomination"])
 @user_in_play
-def complete_nomination():
-    """Handle complete nomination."""
-    log_info("Handle: complete_nomination")
-    CLOCKTOWER_GAME.start_execution_phase()
-    return jsonify({"status": "ok"}), 200
+def nominate_execute():
+    log_info("Handle: nominate_execute")
+    data = request.form
+    try:
+        selected_json = json.loads(data.get("selected_json", "[]"))
+    except json.JSONDecodeError:
+        selected_json = []
+
+    if not selected_json:
+        log_info("No player selected in Imp's ability callback.")
+        return redirect(url_for("state_nomination"))
+
+    log_info(f"Selected player client_id for nomination: {selected_json[0]}")
+
+    player_selected = CLOCKTOWER_GAME.game_state.get_player_by_client_id(
+        selected_json[0]
+    )
+    if not player_selected:
+        log_info(f"No player found for nominated client_id: {selected_json[0]}")
+        return redirect(url_for("state_nomination"))
+
+    log_info(
+        f"Player selected for nomination: {player_selected.name} (client_id: {player_selected.client_id})"
+    )
+
+    CLOCKTOWER_GAME.voting_system.append_nominated_player(player_selected)
+    current_player = CLOCKTOWER_GAME.game_state.get_current_player()
+    CLOCKTOWER_GAME.voting_system.set_nominator(
+        current_player, CLOCKTOWER_GAME.game_state.players
+    )  # Ustawienie nominatora i kolejności głosowania
+    CLOCKTOWER_GAME.nomination_finished()  # Przejście do fazy głosowania
+
+    return redirect(url_for("state_voting"))
 
 
 @app.route("/voting")
@@ -273,6 +324,49 @@ def state_voting():
     """Handle state voting."""
     log_info("Render: /voting")
     return render_voting_page(CLOCKTOWER_GAME)
+
+
+@app.route("/vote_execute", methods=["POST"])
+@require_state(["voting"])
+@user_in_play
+def vote_execute():
+    log_info("Handle: vote_execute")
+    data = request.form
+    try:
+        selected_json = json.loads(data.get("selected_json", "[]"))
+    except json.JSONDecodeError:
+        selected_json = []
+
+    if not selected_json:
+        log_info("No player selected in Imp's ability callback.")
+        return redirect(url_for("state_voting"))
+
+    yes_no_vote = bool(selected_json[0])
+    current_player = CLOCKTOWER_GAME.game_state.get_current_player()
+
+    if yes_no_vote:
+        log_info(f"Player {current_player.name} voted YES for the nominee.")
+        current_player.set_vote_status(PlayerVoteStatus.VOTED_YES)
+        CLOCKTOWER_GAME.voting_system.vote_for_active_nominee(current_player)
+    else:
+        log_info(f"Player {current_player.name} refused to vote for the nominee.")
+        current_player.set_vote_status(PlayerVoteStatus.VOTED_NO)
+
+    if not CLOCKTOWER_GAME.voting_system.apply_next_voter():
+        log_info("All voters have voted, redirecting to nomination results.")
+        CLOCKTOWER_GAME.voting_finished()
+
+    return redirect(url_for("state_voting"))
+
+
+# Finish with nomination -> voting, then enter execution phase
+@app.route("/complete_nomination", methods=["POST"])
+@user_in_play
+def complete_nomination():
+    """Handle complete nomination."""
+    log_info("Handle: complete_nomination")
+    CLOCKTOWER_GAME.start_execution_phase()
+    return jsonify({"status": "ok"}), 200
 
 
 @app.route("/execution")
@@ -335,6 +429,19 @@ def state_next_state():
         return jsonify({"status": "error", "message": "Nieprawidłowy stan gry"}), 400
 
     return jsonify({"status": "ok"}), 200
+
+
+@app.route("/confirm_admin_action")
+@require_state(["night_all_players_action"])
+@user_in_play
+def confirm_admin_action():
+    """Handle confirm admin action."""
+    client_id = session.get("client_id")
+    player = CLOCKTOWER_GAME.game_state.get_player_by_client_id(client_id)
+    if player:
+        player.confirm_admin_action()
+        log_info(f"Player {player.name} confirmed admin action.")
+    return redirect(url_for("state_night_all_players_action"))
 
 
 # =========================

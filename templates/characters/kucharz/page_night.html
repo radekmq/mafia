@@ -3,12 +3,22 @@
 {% block title %}{{ super() }} - Kucharz{% endblock %}
 
 {% block content %}
-{{ super() }}
 
 <div class="container" style="overflow-x:auto;">
-  <p style="white-space: pre-line;">{{ character_data.player_status }}</p>
-</div>
 
+  <table id="playerRoleTable" cellspacing="0" cellpadding="8">
+    <tr>
+      <td colspan="2">
+        <p style="white-space: pre-line;">{{ character_data.player_status }}</p>
+      </td>
+    </tr>
+    {% include "components/confirm_action.html" %}
+
+  </table>
+
+</div></br>
+
+{{ super() }}
 {% endblock %}
 
 {% block scripts %}

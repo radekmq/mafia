@@ -1,4 +1,3 @@
-
 from characters.character import Ability, Character, RoleType
 from logger import log_info
 from utils_render import render_inactive_page, render_player_page

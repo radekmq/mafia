@@ -11,7 +11,14 @@ from logger import IgnoreApiState, log_info
 from player import Player
 from state_machine import CLOCKTOWER_GAME
 from utils import require_state, user_in_play
-from utils_render import render_day_discussion_page, render_introduction_page
+from utils_render import (
+    render_day_discussion_page,
+    render_execution_page,
+    render_game_over_page,
+    render_introduction_page,
+    render_nomination_page,
+    render_voting_page,
+)
 
 # Configuration
 app = Flask(__name__)
@@ -161,7 +168,7 @@ def game_ongoing():
     return render_template("game_ongoing.html")
 
 
-@app.route("/start_game")
+@app.route("/start_game", methods=["GET", "POST"])
 @require_state("lobby")
 @user_in_play
 def start_game():
@@ -169,6 +176,8 @@ def start_game():
     # Metoda jest dynamicznie dodawana przez transitions.Machine.
     # pylint: disable=no-member
     CLOCKTOWER_GAME.start_introduction()
+    if request.method == "POST":
+        return jsonify({"status": "ok"}), 200
     return redirect(url_for("state_players_introduction"))
 
 
@@ -191,10 +200,10 @@ def state_players_introduction():
 
 
 @app.route("/night_selection", methods=["POST"])
-@require_state("night_minion_action")
+@require_state(["night_minion_action", "night_all_players_action"])
 @user_in_play
-def night_minion_action():
-    log_info("Render: /night_minion_action")
+def night_selection():
+    log_info("Handle: night_selection")
     client_id = session.get("client_id")
     CLOCKTOWER_GAME.game_state.get_player_by_client_id(client_id)
     data = request.json
@@ -239,16 +248,52 @@ def state_day_discussions():
     return render_day_discussion_page(CLOCKTOWER_GAME)
 
 
-@app.route("/day_discussions")
-@require_state("day_discussions")
+@app.route("/nomination")
+@require_state("nomination")
 @user_in_play
-def state_day_discussions():
-    """Handle state day discussions."""
-    log_info("Render: /day_discussions")
-    return render_day_discussion_page(CLOCKTOWER_GAME)
+def state_nomination():
+    """Handle state nomination."""
+    log_info("Render: /nomination")
+    return render_nomination_page(CLOCKTOWER_GAME)
 
 
-@app.route("/next_state")
+@app.route("/complete_nomination", methods=["POST"])
+@user_in_play
+def complete_nomination():
+    """Handle complete nomination."""
+    log_info("Handle: complete_nomination")
+    CLOCKTOWER_GAME.start_execution_phase()
+    return jsonify({"status": "ok"}), 200
+
+
+@app.route("/voting")
+@require_state("voting")
+@user_in_play
+def state_voting():
+    """Handle state voting."""
+    log_info("Render: /voting")
+    return render_voting_page(CLOCKTOWER_GAME)
+
+
+@app.route("/execution")
+@require_state("execution")
+@user_in_play
+def state_execution():
+    """Handle state execution."""
+    log_info("Render: /execution")
+    return render_execution_page(CLOCKTOWER_GAME)
+
+
+@app.route("/game_over")
+@require_state("game_over")
+@user_in_play
+def state_game_over():
+    """Handle state game over."""
+    log_info("Render: /game_over")
+    return render_game_over_page(CLOCKTOWER_GAME)
+
+
+@app.route("/next_state", methods=["POST"])
 @user_in_play
 def state_next_state():
     """Handle state next state."""
@@ -256,17 +301,40 @@ def state_next_state():
     if CLOCKTOWER_GAME.state == "players_introduction":
         log_info("Transition from players_introduction to night_minion_action")
         CLOCKTOWER_GAME.start_evil_night_actions()
-        return redirect(url_for("state_night_minion_action"))
 
-    if CLOCKTOWER_GAME.state == "night_minion_action":
+    elif CLOCKTOWER_GAME.state == "night_minion_action":
         log_info("Transition from night_minion_action to night_all_players_action")
         CLOCKTOWER_GAME.start_all_players_night_actions()
-        return redirect(url_for("state_night_all_players_action"))
 
-    if CLOCKTOWER_GAME.state == "night_all_players_action":
+    elif CLOCKTOWER_GAME.state == "night_all_players_action":
         log_info("Transition from night_all_players_action to day_discussions")
         CLOCKTOWER_GAME.all_night_actions_done()
-        return redirect(url_for("state_day_discussions"))
+
+    elif CLOCKTOWER_GAME.state == "day_discussions":
+        log_info("Transition from day_discussions to nomination")
+        CLOCKTOWER_GAME.start_nomination_phase()
+
+    elif CLOCKTOWER_GAME.state == "nomination":
+        log_info("Transition from nomination to voting")
+        CLOCKTOWER_GAME.nomination_finished()
+
+    elif CLOCKTOWER_GAME.state == "voting":
+        log_info("Transition from voting to nomination")
+        CLOCKTOWER_GAME.voting_finished()
+
+    elif CLOCKTOWER_GAME.state == "execution":
+        log_info("Transition from execution to night_minion_action")
+        CLOCKTOWER_GAME.execution_finished()
+
+    elif CLOCKTOWER_GAME.state == "game_over":
+        log_info("Transition from game_over to lobby")
+        CLOCKTOWER_GAME.finish_game()
+
+    else:
+        log_info(f"Invalid state for next_state transition: {CLOCKTOWER_GAME.state}")
+        return jsonify({"status": "error", "message": "Nieprawidłowy stan gry"}), 400
+
+    return jsonify({"status": "ok"}), 200
 
 
 # =========================

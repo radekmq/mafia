@@ -42,8 +42,14 @@ def effect_night_all_players(ct_game):
     player_list = []
     for player in ct_game.game_state.players:
         if player.alive == PlayerStatus.ALIVE:
+            is_minion = (
+                "Minion" if player.character.role_type == RoleType.MINION else ""
+            )
             player_list.append(
-                (f"{player.name} (miejsce: {player.seat_no})", player.client_id)
+                (
+                    f"{player.name} (miejsce: {player.seat_no}) {is_minion}",
+                    player.client_id,
+                )
             )
     log_info(f"Player list for Imp's ability effect: {player_list}")
 
@@ -90,25 +96,37 @@ def ability_callback(ct_game, data: dict):
 
     if current_player is not None:
         current_player.character.imp_night_status = (
-            "\nImp selected player to die: " + str(player_to_die.name)
+            "\nImp wybrał gracza do śmierci: " + str(player_to_die.name)
         )
     ct_game.game_state.get_current_player().night_action_done = True
-    return "Selected player: " + player_to_die.name
+
+    if current_player.poisoned:
+        log_info("Imp is poisoned, applying poison effect (cancell die nomination).")
+        ct_game.game_state.nominated_by_imp_to_die = None
+
+    return "Gracz: " + player_to_die.name + " wybrany do śmierci."
 
 
 def ability_setup(ct_game):
     """Configure for the Imp's ability."""
     # There is no Configure for the Imp's ability
-    current_player = ct_game.game_state.get_current_player()
-    current_player.character.first_night_action_done = False
+    player = ct_game.game_state.get_player_by_character_name("Imp")
+    if player is None:
+        return
+
+    player.character.first_night_action_done = False
 
 
 def on_night_exit(ct_game):
     """Handle actions to perform when the night phase ends for the Imp."""
     # There are no specific actions to perform when the night phase ends for the Imp
-    current_player = ct_game.game_state.get_current_player()
-    if current_player is not None:
-        current_player.night_action_done = False
+    log_info("Imp's on_night_exit called.")
+
+    player = ct_game.game_state.get_player_by_character_name("Imp")
+    if player is None:
+        return
+
+    player.night_action_done = False
 
 
 imp_ability = Ability(

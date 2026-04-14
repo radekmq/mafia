@@ -7,7 +7,7 @@
 {% block scripts %}
 
   <script defer>
-    window.APP_POLL_INTERVAL_MS = 1000;
+    window.APP_POLL_INTERVAL_MS = 500;
 
     let lastEventId = parseInt(localStorage.getItem("lastEventId")) || 0;
     let pollingStarted = false;

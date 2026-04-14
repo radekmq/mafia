@@ -1,0 +1,49 @@
+{% extends "player_page_night.html" %}
+
+{% block title %}{{ super() }} - Truciciel{% endblock %}
+
+{% block content %}
+{{ super() }}
+
+<div class="container" style="overflow-x:auto;">
+
+  <table id="playerRoleTable" cellspacing="0" cellpadding="8">
+    <tr>
+      <td>
+        Demon:
+      </td>
+      <td class="player-status-text">{{ character_data.demon }}</td>
+    </tr>
+    <tr>
+      <td>
+        Lista Minionów:
+      </td>
+      <td class="player-status-text">{{ character_data.minions }}</td>
+    </tr>
+    <tr>
+      <td colspan="2">
+        {% if character_data.allow_truciciel_night_action == True %}
+
+          {% set id = "vote_truciciel" %}
+          {% set title = "Wybierz gracza, którego chcesz otruć:" %}
+          {% set options = character_data.player_list %}
+          {% set max_selections = 1 %}
+          {% set endpoint = "/night_selection" %}
+
+          {% include "components/choice_selector.html" %}
+        {% else %}
+          <p style="text-align: center;">{{ character_data.truciciel_status }}</p>
+        {% endif %}
+
+      </td>
+    </tr>
+  </table>
+
+</div>
+
+{% endblock %}
+
+{% block scripts %}
+{{ super() }}
+
+{% endblock %}

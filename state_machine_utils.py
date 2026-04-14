@@ -124,23 +124,24 @@ def assign_random_characters(game_state: GameState):
     assigned.extend(demons)
 
     # 2. Trzy dodatkowe postacie dla Impa z Townsfolk/Outsider bez powtórek.
-    demon_extra_pool = [
-        char
-        for char in (pool_townsfolk + pool_outsiders)
-        if char.route not in used_routes
-    ]
-    if len(demon_extra_pool) < 3:
-        log_error(
-            "Za mało postaci na dodatkowe role dla demona. "
-            f"Potrzeba: 3, dostępne: {len(demon_extra_pool)}"
-        )
-        raise ValueError(
-            "Za mało postaci na dodatkowe role dla demona. "
-            f"Potrzeba: 3, dostępne: {len(demon_extra_pool)}"
-        )
-    demon_additional = random.sample(demon_extra_pool, 3)
-    for char in demon_additional:
-        used_routes.add(char.route)
+    if no_of_demons > 0:
+        demon_extra_pool = [
+            char
+            for char in (pool_townsfolk + pool_outsiders)
+            if char.route not in used_routes
+        ]
+        if len(demon_extra_pool) < 3:
+            log_error(
+                "Za mało postaci na dodatkowe role dla demona. "
+                f"Potrzeba: 3, dostępne: {len(demon_extra_pool)}"
+            )
+            raise ValueError(
+                "Za mało postaci na dodatkowe role dla demona. "
+                f"Potrzeba: 3, dostępne: {len(demon_extra_pool)}"
+            )
+        demon_additional = random.sample(demon_extra_pool, 3)
+        for char in demon_additional:
+            used_routes.add(char.route)
 
     # 3. Minion(y)
     minions = draw_from_pool(pool_minions, no_of_minions, "minion")

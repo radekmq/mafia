@@ -1,21 +1,102 @@
 from characters.character import Ability, Character, RoleType
-from game_state import GameState
+from logger import log_info
+from player import PlayerStatus
+from utils_render import render_inactive_page, render_player_page
 
 
-def ability_effect_night_minion(game_state: GameState):
+def ability_effect_night_minion(ct_game):
     """Effect of the Truciciel's ability."""
+    log_info("Truciciel's ability effect for night_minion_action called.")
+    current_player = ct_game.game_state.get_current_player()
+
+    if current_player is None:
+        log_info("No current player found for Truciciel's ability effect.")
+        return "No current player found."
+
+    if (
+        ct_game.state != "night_all_players_action"
+        and ct_game.state != "night_minion_action"
+    ):
+        log_info("Truciciel's ability effect called outside of night_action state.")
+        return render_inactive_page(ct_game)
+
+    player_list = []
+    for player in ct_game.game_state.players:
+        if (
+            player.alive == PlayerStatus.ALIVE
+            and player.client_id != current_player.client_id
+        ):
+            is_minion = (
+                ", Minion" if player.character.role_type == RoleType.MINION else ""
+            )
+            is_demon = ", Demon" if player.character.role_type == RoleType.DEMON else ""
+            player_list.append(
+                (
+                    f"{player.name} (miejsce: {player.seat_no}{is_minion}{is_demon})",
+                    player.client_id,
+                )
+            )
+    log_info(f"Player list for Truciciel's ability effect: {player_list}")
+
+    list_of_minions = [
+        player.name
+        for player in ct_game.game_state.players
+        if player.character.role_type == RoleType.MINION
+    ]
+    if not list_of_minions:
+        list_of_minions = ["Brak Minionów w grze"]
+
+    demon = [
+        player.name
+        for player in ct_game.game_state.players
+        if player.character.role_type == RoleType.DEMON
+    ]
+
+    return render_player_page(
+        ct_game,
+        "characters/truciciel/page_night.html",
+        {
+            "allow_truciciel_night_action": not current_player.night_action_done,
+            "player_list": player_list,
+            "truciciel_status": current_player.character.truciciel_night_status,
+            "demon": demon[0],
+            "minions": ", ".join(list_of_minions),
+        },
+    )
 
 
-def ability_callback(game_state: GameState, data: dict):
+def ability_callback(ct_game, data: dict):
     """Handle callback for the Truciciel's ability."""
+    log_info(f"Truciciel's ability callback called with data: {data}")
+
+    current_player = ct_game.game_state.get_current_player()
+    current_player.night_action_done = True
+    poisoned_character = ct_game.game_state.get_player_by_client_id(
+        data.get("selected")[0]
+    )
+    log_info(
+        f"Gracz wybrany do zatrucia: {poisoned_character.name if poisoned_character else 'None'}"
+    )
+    current_player.character.truciciel_night_status = (
+        f"\nGracz {poisoned_character.name} został wybrany do zatrucia."
+    )
+    return "Gracz: " + poisoned_character.name + " jest wybrany do zatrucia."
 
 
-def ability_setup(game_state: GameState):
+def ability_setup(ct_game):
     """Configure for the Truciciel's ability."""
 
 
-def on_night_exit(game_state: GameState):
+def on_night_exit(ct_game):
     """Handle actions to perform when the night phase ends for the Truciciel."""
+    log_info("Truciciel's on_night_exit called.")
+
+    player = ct_game.game_state.get_player_by_character_name("Truciciel")
+    if player is None:
+        return
+
+    player.night_action_done = False
+    player.character.truciciel_night_status = None
 
 
 char_ability = Ability(
@@ -25,6 +106,7 @@ char_ability = Ability(
         "działanie zdolności postaci."
     ),
     effect_night_minion=ability_effect_night_minion,
+    effect_night_all_players=ability_effect_night_minion,
     callback_night=ability_callback,
     setup=ability_setup,
     on_night_exit=on_night_exit,
@@ -44,3 +126,5 @@ class TrucicielCharacter(Character):
             image_path="truciciel.png",
             route="truciciel",
         )
+
+        self.truciciel_night_status = None

@@ -1,0 +1,17 @@
+{% extends "player_page_night.html" %}
+
+{% block title %}{{ super() }} - Kucharz{% endblock %}
+
+{% block content %}
+{{ super() }}
+
+<div class="container" style="overflow-x:auto;">
+  <p style="white-space: pre-line;">{{ character_data.player_status }}</p>
+</div>
+
+{% endblock %}
+
+{% block scripts %}
+{{ super() }}
+
+{% endblock %}

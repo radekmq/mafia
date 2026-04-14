@@ -34,8 +34,14 @@ class GameState:
         self.action_truciciel_done = action_truciciel_done
         self.action_imp_done = action_imp_done
         self.last_executed_player = last_executed_player
+
+        # ten atrybut określa, którego gracza Imp wybrał do zabicia w nocy.
         self.nominated_by_imp_to_die = nominated_by_imp_to_die
+
+        # określa czy kruk zginął poprzedniej nocy
         self.kruk_died_last_night = kruk_died_last_night
+
+        # licznik nominacji dziewiczej, potrzebny do sprawdzania warunku zwycięstwa Mieszkańców
         self.virgin_nomination_counter = virgin_nomination_counter
 
         # jeśli True, to gra będzie przebiegać automatycznie, z minimalną interakcją moderatora
@@ -69,6 +75,13 @@ class GameState:
         """Handle get player by client id."""
         for player in self.players:
             if player.client_id == client_id:
+                return player
+        return None
+
+    def get_player_by_character_name(self, character_name: str) -> Player | None:
+        """Handle get player by character name."""
+        for player in self.players:
+            if player.character and player.character.name == character_name:
                 return player
         return None
 

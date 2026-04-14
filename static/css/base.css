@@ -165,6 +165,36 @@ button {
   cursor: not-allowed;
 }
 
+.choice-container.status-display .option {
+  cursor: default;
+  transition: none;
+  pointer-events: none;
+  background: #f3ede2;
+  border-color: #c8baa2;
+  color: #4b3d2e;
+  box-shadow: none;
+}
+
+.choice-container.status-display .option:hover {
+  background: inherit;
+  border-color: inherit;
+  transform: none;
+}
+
+.choice-container.status-display .option.status-true {
+  background: #dfe9d8;
+  border-color: #9daf8e;
+  color: #344a2c;
+  opacity: 1;
+}
+
+.choice-container.status-display .option.status-false {
+  background: #eee8dc;
+  border-color: #cfc2ad;
+  color: #7a6b57;
+  opacity: 1;
+}
+
 .player-status-text {
   white-space: pre-line;
 }

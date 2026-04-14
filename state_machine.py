@@ -3,8 +3,10 @@
 from flask import session, url_for
 from transitions import Machine
 
+from characters.character import RoleType
 from game_state import GameState
 from logger import log_info
+from player import PlayerStatus
 from state_machine_utils import assign_random_characters, log_players_status_table
 from utils import EventIDGenerator
 
@@ -37,7 +39,8 @@ class ClocktowerGame:
         log_info("[SM on enter] Przedstawienie ról graczy")
         self.game_state.game_ongoing = True
         assign_random_characters(self.game_state)
-        self.game_state.get_current_player().character.ability.setup(self)
+        for player in self.game_state.players:
+            player.character.ability.setup(self)
         log_players_status_table(self.game_state)
 
     def on_enter_night_minion_action(self):
@@ -56,9 +59,13 @@ class ClocktowerGame:
         log_info(f"[SM on enter] Dzień {self.day_number} – dyskusja")
         log_players_status_table(self.game_state)
 
-    def on_enter_nomination_and_voting(self):
-        """Handle on enter nomination and voting."""
-        log_info("[SM on enter] Nominacje i głosowanie")
+    def on_enter_nomination(self):
+        """Handle on enter nomination."""
+        log_info("[SM on enter] Nominacje")
+
+    def on_enter_voting(self):
+        """Handle on enter voting."""
+        log_info("[SM on enter] Głosowanie")
 
     def on_enter_execution(self):
         """Handle on enter execution."""
@@ -84,18 +91,24 @@ class ClocktowerGame:
 
     def on_exit_night_minion_action(self):
         """Handle on exit night minion action."""
-        log_info("[SM on exit] Złe postacie wykonały akcje")
+        log_info("[SM on exit] Minionki wykonały akcje")
 
     def on_exit_night_all_players_action(self):
         """Handle on exit night all players action."""
         log_info("[SM on exit] Wszystkie akcje nocne zakończone")
+        for player in self.game_state.players:
+            player.character.ability.on_night_exit(self)
 
     def on_exit_day_discussions(self):
         """Handle on exit day discussions."""
         log_info("[SM on exit] Koniec dyskusji")
 
-    def on_exit_nomination_and_voting(self):
-        """Handle on exit nomination and voting."""
+    def on_exit_nomination(self):
+        """Handle on exit nomination."""
+        log_info("[SM on exit] Koniec nominacji")
+
+    def on_exit_voting(self):
+        """Handle on exit voting."""
         log_info("[SM on exit] Koniec głosowania")
 
     def on_exit_execution(self):
@@ -109,7 +122,30 @@ class ClocktowerGame:
     def should_end_game(self):
         """Zaimplementujesz: warunki zwycięstwa (Imp vs Town)."""
         log_info("[SM] Sprawdzanie warunków zakończenia gry")
-        return False  # Placeholder, implement actual win conditions here
+        if self.game_state.nominated_by_imp_to_die is not None:
+            for player_id_to_die in self.game_state.nominated_by_imp_to_die:
+                player_to_die = self.game_state.get_player_by_client_id(
+                    player_id_to_die
+                )
+                player_to_die.alive = PlayerStatus.DEAD
+                log_info(f"Players successfully killed by Imp: {player_to_die.name}")
+            self.game_state.nominated_by_imp_to_die = None
+
+        no_of_alive_players = len(
+            [
+                player
+                for player in self.game_state.players
+                if player.alive == PlayerStatus.ALIVE
+            ]
+        )
+        log_info(f"Number of alive players: {no_of_alive_players}")
+        is_demon_alive = any(
+            player.alive == PlayerStatus.ALIVE
+            and player.character.role_type == RoleType.DEMON
+            for player in self.game_state.players
+        )
+        log_info(f"Is Demon alive: {is_demon_alive}")
+        return is_demon_alive is False or no_of_alive_players <= 2
 
     def page_configuration(self):
         """
@@ -168,7 +204,8 @@ states = [
     "night_minion_action",
     "night_all_players_action",
     "day_discussions",
-    "nomination_and_voting",
+    "nomination",
+    "voting",
     "execution",
     "game_over",
 ]
@@ -205,13 +242,23 @@ transitions = [
     },
     # DZIEŃ
     {
-        "trigger": "start_voting_phase",
+        "trigger": "start_nomination_phase",
         "source": "day_discussions",
-        "dest": "nomination_and_voting",
+        "dest": "nomination",
+    },
+    {
+        "trigger": "nomination_finished",
+        "source": "nomination",
+        "dest": "voting",
     },
     {
         "trigger": "voting_finished",
-        "source": "nomination_and_voting",
+        "source": "voting",
+        "dest": "nomination",
+    },
+    {
+        "trigger": "start_execution_phase",
+        "source": "nomination",
         "dest": "execution",
     },
     # 👉 ZNOWU: najpierw game_over
@@ -225,6 +272,11 @@ transitions = [
         "trigger": "execution_finished",
         "source": "execution",
         "dest": "night_minion_action",
+    },
+    {
+        "trigger": "finish_game",
+        "source": "game_over",
+        "dest": "lobby",
     },
 ]
 

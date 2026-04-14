@@ -1,25 +1,131 @@
 {% if is_admin %}
 
 <div class="container" style="overflow-x:auto;">
-  <h3 style="text-align: center; margin-top: 0;">Panel moderatora gry</h3>
+
+  <h3 style="text-align: center; margin-top: 0;">
+    Panel moderatora gry
+  </h3>
+
+  <!-- 📢 Komunikaty (ukryte domyślnie) -->
+  <div id="messageBox" style="display:none; text-align:center; margin:10px 0;"></div>
 
   <table id="playerRoleTable" cellspacing="0" cellpadding="8">
 
-    {% if game_state == "lobby" %}
+    <tr>
+      {% if game_state == "lobby" %}
       <td colspan="2" style="text-align: center;">
-        <button onclick="window.location.href='/start_game'">Rozpocznij grę</button>
+        <button onclick="startGame()">Rozpocznij grę</button>
       </td>
-    {% endif %}
+      {% endif %}
 
-    {% if game_state != "lobby" %}
+      {% if game_state != "lobby" %}
       <td colspan="2" style="text-align: center;">
-        <button onclick="window.location.href='/next_state'">Następny etap</button>
+        <button onclick="nextState()">Następny etap</button>
+        {% if game_state == "nomination" %}
+          <button onclick="completeNomination()">Zakończ nominacje</button>
+        {% endif %}
       </td>
-    {% endif %}
-
+      {% endif %}
     </tr>
+
   </table>
 </div>
 
+<script>
+function showError(text) {
+  const box = document.getElementById("messageBox");
+
+  box.innerText = text;
+  box.style.display = "block";
+  box.style.padding = "10px";
+  box.style.borderRadius = "6px";
+  box.style.marginTop = "10px";
+
+  box.style.background = "#ffdddd";
+  box.style.color = "#a10000";
+  box.style.border = "1px solid #ff5c5c";
+}
+
+function hideMessage() {
+  const box = document.getElementById("messageBox");
+  box.style.display = "none";
+}
+
+document.addEventListener("DOMContentLoaded", () => {
+  hideMessage(); // 🔥 start bez komunikatu
+});
+
+function startGame() {
+  fetch('/start_game', { method: 'POST' })
+    .then(async res => {
+      let data;
+
+      try {
+        data = await res.json();
+      } catch {
+        showError("Nieprawidłowa odpowiedź serwera");
+        return;
+      }
+
+      if (!res.ok || data.status === "error") {
+        showError(data.message || "Nie udało się uruchomić gry");
+        return;
+      }
+
+      hideMessage(); // 🔥 sukces = nic nie pokazujemy
+    })
+    .catch(() => {
+      showError("Błąd połączenia z serwerem");
+    });
+}
+
+function nextState() {
+  fetch('/next_state', { method: 'POST' })
+    .then(async res => {
+      let data;
+
+      try {
+        data = await res.json();
+      } catch {
+        showError("Nieprawidłowa odpowiedź serwera");
+        return;
+      }
+
+      if (!res.ok || data.status === "error") {
+        showError(data.message || "Nie udało się przejść do następnego etapu");
+        return;
+      }
+
+      hideMessage(); // 🔥 sukces = brak komunikatu
+    })
+    .catch(() => {
+      showError("Błąd połączenia z serwerem");
+    });
+}
+
+function completeNomination() {
+  fetch('/complete_nomination', { method: 'POST' })
+    .then(async res => {
+      let data;
+
+      try {
+        data = await res.json();
+      } catch {
+        showError("Nieprawidłowa odpowiedź serwera");
+        return;
+      }
+
+      if (!res.ok || data.status === "error") {
+        showError(data.message || "Nie udało się zakończyć nominacji");
+        return;
+      }
+
+      hideMessage(); // 🔥 sukces = brak komunikatu
+    })
+    .catch(() => {
+      showError("Błąd połączenia z serwerem");
+    });
+}
+</script>
 
 {% endif %}

@@ -27,19 +27,22 @@ class EventIDGenerator:
             return self._value
 
 
-def require_state(required_state):
+def require_state(required_states):
     """Handle require state."""
+
+    if isinstance(required_states, str):
+        required_states = [required_states]
 
     def decorator(f):
         @wraps(f)
         def wrapper(*args, **kwargs):
             """Handle wrapper."""
-            log_info(f"Validate required states: {required_state}")
+            log_info(f"Validate required states: {required_states}")
             from state_machine import CLOCKTOWER_GAME
 
             current_state = CLOCKTOWER_GAME.state
 
-            if current_state != required_state:
+            if current_state not in required_states:
                 # przekierowanie do właściwego endpointu
                 return redirect(url_for(f"state_{current_state}"))
 
@@ -84,8 +87,9 @@ def get_state_description(game_state):
         "night_minion_action": "NOC – akcja minionów",
         "night_all_players_action": "NOC – akcje wszystkich graczy",
         "day_discussions": "DZIEŃ – dyskusja",
-        "nomination_and_voting": "DZIEŃ - Nominacje i głosowanie",
-        "execution": "DZIEŃ - Egzekucja",
+        "nomination": "DZIEŃ - nominacja",
+        "voting": "DZIEŃ - głosowanie",
+        "execution": "DZIEŃ - egzekucja",
         "game_over": "Koniec gry",
     }
     return descriptions[game_state]

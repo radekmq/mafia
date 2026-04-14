@@ -1,20 +1,19 @@
 from characters.character import Ability, Character, RoleType
-from game_state import GameState
 
 
-def ability_effect_night_minion(game_state: GameState):
+def ability_effect_night_minion(ct_game):
     """Effect of the Żołnierz's ability."""
 
 
-def ability_callback(game_state: GameState, data: dict):
+def ability_callback(ct_game, data: dict):
     """Handle callback for the Żołnierz's ability."""
 
 
-def ability_setup(game_state: GameState):
+def ability_setup(ct_game):
     """Configure for the Żołnierz's ability."""
 
 
-def on_night_exit(game_state: GameState):
+def on_night_exit(ct_game):
     """Handle actions to perform when the night phase ends for the Żołnierz."""
 
 
@@ -37,7 +36,7 @@ class ZolnierzCharacter(Character):
         """Initialize the Żołnierz character."""
 
         super().__init__(
-            name="Zolnierz",
+            name="Żołnierz",
             role_type=RoleType.TOWNSFOLK,
             ability=char_ability,
             image_path="zolnierz.png",

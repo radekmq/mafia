@@ -1,20 +1,27 @@
+
 from characters.character import Ability, Character, RoleType
-from game_state import GameState
+from utils_render import render_inactive_page
 
 
-def ability_effect_night_minion(game_state: GameState):
+def ability_effect_night_minion(ct_game):
     """Effect of the Empata's ability."""
+    return render_inactive_page(ct_game)
 
 
-def ability_callback(game_state: GameState, data: dict):
+def effect_night_all_players(ct_game):
+    """Effect of the Empata's ability during night_all_players_action state."""
+    return render_inactive_page(ct_game)
+
+
+def ability_callback(ct_game, data: dict):
     """Handle callback for the Empata's ability."""
 
 
-def ability_setup(game_state: GameState):
+def ability_setup(ct_game):
     """Configure for the Empata's ability."""
 
 
-def on_night_exit(game_state: GameState):
+def on_night_exit(ct_game):
     """Handle actions to perform when the night phase ends for the Empata."""
 
 
@@ -25,6 +32,7 @@ char_ability = Ability(
         "czy sąsiadujący z nim gracze są dobrzy czy źli."
     ),
     effect_night_minion=ability_effect_night_minion,
+    effect_night_all_players=effect_night_all_players,
     callback_night=ability_callback,
     setup=ability_setup,
     on_night_exit=on_night_exit,

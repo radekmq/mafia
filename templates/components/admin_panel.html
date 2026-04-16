@@ -30,7 +30,7 @@
     {% if game_state == "night_minion_action" %}
     <tr>
       <td>Akcja minionów:</td>
-      <td>{{ minion_action_status }}</td>
+      <td><p id="minionActionStatus">{{ minion_action_status }}</p></td>
     </tr>
     {% endif %}
   </table>
@@ -176,10 +176,18 @@ function completeNomination() {
     });
   }
 
+  function updateMinionStatus(minionStatus) {
+    const statusElement = document.getElementById("minionActionStatus");
+    if (statusElement) {
+      statusElement.textContent = minionStatus;
+    }
+  }
+
   window.onAdminStatusUpdate = function(data) {
     const adminStatus = data.admin_confirm_status || [];
 
     updateAdminStatus(adminStatus);
+    updateMinionStatus(data.minion_action_status);
   };
 
   </script>

@@ -88,6 +88,7 @@ def ability_callback(ct_game, data):
     current_player.character.truciciel_night_status = (
         f"\nGracz {poisoned_character.name} został otruty."
     )
+    current_player.confirm_minion_action()
     return ability_effect_night_minion(ct_game)
 
 

@@ -4,7 +4,7 @@
 TROUBLE_BREWING_SETUP = [
     # To be deleted
     {"gracze": 1, "Mieszkańcy": 0, "Outsiderzy": 0, "Minionki": 0, "Demon": 1},
-    {"gracze": 2, "Mieszkańcy": 1, "Outsiderzy": 0, "Minionki": 0, "Demon": 1},
+    {"gracze": 2, "Mieszkańcy": 0, "Outsiderzy": 0, "Minionki": 1, "Demon": 1},
     {"gracze": 3, "Mieszkańcy": 1, "Outsiderzy": 0, "Minionki": 1, "Demon": 1},
     {"gracze": 4, "Mieszkańcy": 2, "Outsiderzy": 0, "Minionki": 1, "Demon": 1},
     # Up to here

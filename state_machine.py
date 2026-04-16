@@ -8,7 +8,7 @@ from game_state import GameState
 from logger import log_info
 from player import PlayerStatus
 from state_machine_utils import assign_random_characters, log_players_status_table
-from utils import EventIDGenerator
+from utils import EventIDGenerator, get_minion_action_status, log_dicts_table
 from voting import VotingSystem
 
 
@@ -58,6 +58,11 @@ class ClocktowerGame:
     def on_enter_night_all_players_action(self):
         """Handle on enter night all players action."""
         log_info("[SM on enter] Noc – akcje wszystkich postaci")
+        log_players_status_table(self.game_state)
+
+    def on_enter_night_summary(self):
+        """Handle on enter night presentations."""
+        log_info("[SM on enter] Noc – prezentacja ról i efektów nocnych")
         log_players_status_table(self.game_state)
 
     def on_enter_day_discussions(self):
@@ -122,7 +127,12 @@ class ClocktowerGame:
         for player in self.game_state.players:
             if player.character is not None:
                 player.character.ability.on_night_exit(self)
-            player.reset_admin_confirmation()
+                player.reset_admin_confirmation()
+                player.reset_minion_confirmation()
+
+    def on_exit_night_summary(self):
+        """Handle on exit night presentations."""
+        log_info("[SM on exit] Zakończono prezentacje nocne")
 
     def on_exit_day_discussions(self):
         """Handle on exit day discussions."""
@@ -151,26 +161,6 @@ class ClocktowerGame:
         """Zaimplementujesz: warunki zwycięstwa (Imp vs Town)."""
 
         log_info("[SM] Sprawdzanie warunków zakończenia gry")
-        nominated_to_die = self.game_state.nominated_by_imp_to_die
-        nominated_to_replace = self.game_state.demon_replacement_candidate
-
-        # Najpierw ustalmy, czy Imp jest martwy
-        if nominated_to_die is not None:
-            log_info(f"Players successfully killed by Imp: {nominated_to_die.name}")
-            nominated_to_die.alive = PlayerStatus.DEAD
-
-            if nominated_to_replace is not None:
-                log_info(f"Replacing Demon with: {nominated_to_replace.name}")
-                nominated_to_replace.character = nominated_to_die.character
-                nominated_to_replace.additional_characters = (
-                    nominated_to_die.additional_characters
-                )
-                nominated_to_die.character = None
-                nominated_to_die.additional_characters = []
-
-            self.game_state.nominated_by_imp_to_die = None
-            self.game_state.demon_replacement_candidate = None
-
         no_of_alive_players = len(
             [
                 player
@@ -188,8 +178,7 @@ class ClocktowerGame:
         log_info(f"Is Demon alive: {is_demon_alive}")
 
         # TEMP always false - DELETE when testing is done
-        return False
-
+        # return False
         return is_demon_alive is False or no_of_alive_players <= 2
 
     def page_configuration(self):
@@ -201,24 +190,33 @@ class ClocktowerGame:
         które może być używane do odświeżenia strony po stronie klienta.
         Dzięki temu klient może aktualizować interfejs użytkownika odpowiednio do aktualnego stanu.
         """
-        page_config = {
-            "url": url_for(f"state_{self.state}"),
-            "no_of_players": len(self.game_state.players),
-            "active_voting_player_client_id": self.voting_system.get_active_voter_client_id()
+
+        active_voting_player_client_id = (
+            self.voting_system.get_active_voter_client_id()
             if self.state == "voting"
-            else None,
-            "player_vote_status": [
+            else None
+        )
+        player_vote_status = (
+            [
                 {"name": player.name, "vote_status": player.get_vote_status().value}
                 for player in self.game_state.players
             ]
             if self.state == "voting"
-            else None,
-            "admin_confirm_status": [
-                {"name": player.name, "confirmed": player.is_admin_action_confirmed()}
-                for player in self.game_state.players
-            ]
-            if self.state in ["night_all_players_action"]
-            else None,
+            else None
+        )
+
+        admin_confirm_status = [
+            {"name": player.name, "confirmed": player.is_admin_action_confirmed()}
+            for player in self.game_state.players
+        ]
+
+        page_config = {
+            "url": url_for(f"state_{self.state}"),
+            "no_of_players": len(self.game_state.players),
+            "active_voting_player_client_id": active_voting_player_client_id,
+            "player_vote_status": player_vote_status,
+            "admin_confirm_status": admin_confirm_status,
+            "minion_action_status": get_minion_action_status(self),
         }
 
         if session.get("client_id") not in [
@@ -250,6 +248,12 @@ class ClocktowerGame:
 
         if has_changed:
             log_info(f"Page configuration: {page_config}")
+            log_dicts_table(
+                player_vote_status, title="Player vote status"
+            ) if player_vote_status else None
+            log_dicts_table(
+                admin_confirm_status, title="Admin confirmation status"
+            ) if admin_confirm_status else None
 
         return page_config
 
@@ -263,6 +267,7 @@ states = [
     "players_introduction",
     "night_minion_action",
     "night_all_players_action",
+    "night_summary",
     "day_discussions",
     "nomination",
     "voting",
@@ -288,16 +293,21 @@ transitions = [
         "source": "night_minion_action",
         "dest": "night_all_players_action",
     },
-    # 👉 PRIORYTET: najpierw sprawdzamy game_over
     {
         "trigger": "all_night_actions_done",
         "source": "night_all_players_action",
+        "dest": "night_summary",
+    },
+    # 👉 PRIORYTET: najpierw sprawdzamy game_over
+    {
+        "trigger": "start_day_discussions",
+        "source": "night_summary",
         "dest": "game_over",
         "conditions": "should_end_game",
     },
     {
-        "trigger": "all_night_actions_done",
-        "source": "night_all_players_action",
+        "trigger": "start_day_discussions",
+        "source": "night_summary",
         "dest": "day_discussions",
     },
     # DZIEŃ

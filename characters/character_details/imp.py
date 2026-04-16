@@ -106,6 +106,7 @@ def ability_callback(ct_game, data, replace_demon=False):
 
     current_player = ct_game.game_state.get_current_player()
     player_selected = ct_game.game_state.get_player_by_client_id(selected_json[0])
+    current_player.confirm_admin_action()
 
     if player_selected is None:
         log_info("Selected player for Imp's ability callback not found.")
@@ -200,6 +201,26 @@ def on_night_exit(ct_game):
 
     player.night_action_done = False
     player.character.first_night_action_done = True
+
+    nominated_to_die = ct_game.game_state.nominated_by_imp_to_die
+    nominated_to_replace = ct_game.game_state.demon_replacement_candidate
+
+    # Najpierw ustalmy, czy Imp jest martwy
+    if nominated_to_die is not None:
+        log_info(f"Players successfully killed by Imp: {nominated_to_die.name}")
+        nominated_to_die.alive = PlayerStatus.DEAD
+
+        if nominated_to_replace is not None:
+            log_info(f"Replacing Demon with: {nominated_to_replace.name}")
+            nominated_to_replace.character = nominated_to_die.character
+            nominated_to_replace.additional_characters = (
+                nominated_to_die.additional_characters
+            )
+            nominated_to_die.character = None
+            nominated_to_die.additional_characters = []
+
+        ct_game.game_state.nominated_by_imp_to_die = None
+        ct_game.game_state.demon_replacement_candidate = None
 
 
 imp_ability = Ability(

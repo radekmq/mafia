@@ -36,6 +36,9 @@
 
       </td>
     </tr>
+    {% if character_data.allow_truciciel_night_action == False %}
+      {% include "components/confirm_action.html" %}
+    {% endif %}
   </table>
 
 </div></br>

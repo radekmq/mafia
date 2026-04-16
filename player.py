@@ -53,6 +53,8 @@ class Player:
         self.player_status = None
         self.vote_status = PlayerVoteStatus.NOT_VOTED
         self.night_action_done = False
+        self.admin_confirm_action = False
+        self.minion_confirm_action = False
         self.lock = threading.Lock()
 
     def reset_status(self):
@@ -65,6 +67,7 @@ class Player:
         self.player_status = None
         self.night_action_done = False
         self.admin_confirm_action = False
+        self.minion_confirm_action = False
 
     def set_vote_status(self, vote_status: PlayerVoteStatus):
         """Set vote status."""
@@ -95,3 +98,18 @@ class Player:
         """Check if admin action is confirmed."""
         with self.lock:
             return self.admin_confirm_action
+
+    def confirm_minion_action(self):
+        """Confirm minion action."""
+        with self.lock:
+            self.minion_confirm_action = True
+
+    def reset_minion_confirmation(self):
+        """Reset minion confirmation."""
+        with self.lock:
+            self.minion_confirm_action = False
+
+    def is_minion_action_confirmed(self) -> bool:
+        """Check if minion action is confirmed."""
+        with self.lock:
+            return self.minion_confirm_action

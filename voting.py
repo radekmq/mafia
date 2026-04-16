@@ -146,6 +146,8 @@ class VotingSystem:
 
             if len(players_with_highest_votes) != 1:
                 return None
+            if players_with_highest_votes[0] == 0:
+                return None
 
             return players_with_highest_votes[0]
 

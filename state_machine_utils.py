@@ -18,12 +18,13 @@ def log_players_status_table(game_state: GameState):
 
     headers = [
         "Nazwa gracza",
-        "Client ID",
+        "Seat",
         "Postać",
         "Dodatkowe postaci",
         "Pijany",
         "Poisoned",
         "Alive",
+        "Protected",
     ]
 
     rows = []
@@ -34,6 +35,7 @@ def log_players_status_table(game_state: GameState):
         )
         drunk = "TAK" if player.drunk else "NIE"
         poisoned = "TAK" if player.poisoned else "NIE"
+        protected = "TAK" if player.protected else "NIE"
         alive = (
             player.alive.value.upper()
             if hasattr(player.alive, "value")
@@ -43,12 +45,13 @@ def log_players_status_table(game_state: GameState):
         rows.append(
             [
                 player.name,
-                player.client_id,
+                player.seat_no,
                 character_name,
                 additional,
                 drunk,
                 poisoned,
                 alive,
+                protected,
             ]
         )
 

@@ -5,20 +5,7 @@ from flask import redirect, render_template, url_for
 from characters.character import RoleType
 from logger import log_info
 from player import PlayerStatus, PlayerVoteStatus
-from utils import get_state_description
-
-
-def get_minion_action_status(ct_game):
-    """Get minion action status."""
-    minion_action_status = True
-    for player in ct_game.game_state.players:
-        if player.character and player.character.role_type == RoleType.MINION:
-            if not player.night_action_done:
-                minion_action_status = False
-                break
-    status = "Wykonana" if minion_action_status else "trwa ..."
-    log_info(f"Minion action status: {status}")
-    return status
+from utils import get_minion_action_status, get_state_description
 
 
 def render_player_page(ct_game, template_name: str, data: dict):
@@ -55,6 +42,9 @@ def render_player_page(ct_game, template_name: str, data: dict):
         else None,
         player_confirmed_action=current_player.is_admin_action_confirmed()
         if ct_game.state in ["night_all_players_action"]
+        else None,
+        minion_confirmed_action=current_player.is_minion_action_confirmed()
+        if ct_game.state in ["night_minion_action"]
         else None,
     )
 

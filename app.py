@@ -186,7 +186,7 @@ def start_game():
 
 
 @app.route("/players_introduction")
-@require_state("players_introduction")
+@require_state(["players_introduction", "night_summary"])
 @user_in_play
 def state_players_introduction():
     """Handle state players introduction."""
@@ -404,6 +404,10 @@ def state_next_state():
         log_info("Transition from night_all_players_action to day_discussions")
         CLOCKTOWER_GAME.all_night_actions_done()
 
+    elif CLOCKTOWER_GAME.state == "night_summary":
+        log_info("Transition from night_summary to day_discussions")
+        CLOCKTOWER_GAME.start_day_discussions()
+
     elif CLOCKTOWER_GAME.state == "day_discussions":
         log_info("Transition from day_discussions to nomination")
         CLOCKTOWER_GAME.start_nomination_phase()
@@ -442,6 +446,29 @@ def confirm_admin_action():
         player.confirm_admin_action()
         log_info(f"Player {player.name} confirmed admin action.")
     return redirect(url_for("state_night_all_players_action"))
+
+
+@app.route("/confirm_minion_action")
+@require_state(["night_minion_action"])
+@user_in_play
+def confirm_minion_action():
+    """Handle confirm minion action."""
+    client_id = session.get("client_id")
+    player = CLOCKTOWER_GAME.game_state.get_player_by_client_id(client_id)
+    if player:
+        player.confirm_minion_action()
+        log_info(f"Player {player.name} confirmed minion action.")
+    return redirect(url_for("state_night_minion_action"))
+
+
+@app.route("/night_summary")
+@require_state("night_summary")
+@user_in_play
+def state_night_summary():
+    """Handle state night presentations."""
+    log_info("Render: /night_summary")
+
+    return redirect(url_for("state_players_introduction"))
 
 
 # =========================

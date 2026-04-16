@@ -16,7 +16,7 @@ DB_CHARACTERS = {
     "bibliotekarka": BibliotekarkaCharacter(),
     "detektyw": DetektywCharacter(),
     "kucharz": KucharzCharacter(),
-    "empata": EmpataCharacter(),
+    # "empata": EmpataCharacter(),
     # "jasnowidz": JasnowidzCharacter(),
     # "grabarz": GrabarzCharacter(),
     # "mnich": MnichCharacter(),

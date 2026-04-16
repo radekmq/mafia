@@ -10,12 +10,6 @@
   <div id="messageBox" style="display:none; text-align:center; margin:10px 0;"></div>
 
   <table id="playerRoleTable" cellspacing="0" cellpadding="8">
-    {% if game_state == "night_minion_action" %}
-    <tr>
-      <td>Akcja minionów:</td>
-      <td>{{ minion_action_status }}</td>
-    </tr>
-    {% endif %}
     <tr>
       {% if game_state == "lobby" %}
       <td colspan="2" style="text-align: center;">
@@ -33,8 +27,32 @@
       </td>
       {% endif %}
     </tr>
-
+    {% if game_state == "night_minion_action" %}
+    <tr>
+      <td>Akcja minionów:</td>
+      <td>{{ minion_action_status }}</td>
+    </tr>
+    {% endif %}
   </table>
+
+  {% if game_state == "night_all_players_action" %}
+    <table id="adminStatusTable">
+      <thead>
+        <tr>
+          <th>Gracz</th>
+          <th>Status potwierdzenia</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for player in admin_confirm_status %}
+          <tr>
+            <td>{{ player.name }}</td>
+            <td>{{ "Potwierdzona" if player.confirmed else "Oczekuje" }}</td>
+          </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  {% endif %}
 </div>
 
 <script>
@@ -134,5 +152,36 @@ function completeNomination() {
 }
 
 </script>
+
+<script>
+
+  function updateAdminStatus(adminStatus) {
+    const tableBody = document.querySelector("#adminStatusTable tbody");
+    if (!tableBody) return;
+
+    tableBody.innerHTML = ""; // Wyczyść istniejące wiersze
+
+    adminStatus.forEach(player => {
+      const row = document.createElement("tr");
+
+      const nameCell = document.createElement("td");
+      nameCell.textContent = player.name;
+      row.appendChild(nameCell);
+
+      const statusCell = document.createElement("td");
+      statusCell.textContent = player.confirmed ? "Potwierdzona" : "Oczekuje";
+      row.appendChild(statusCell);
+
+      tableBody.appendChild(row);
+    });
+  }
+
+  window.onAdminStatusUpdate = function(data) {
+    const adminStatus = data.admin_confirm_status || [];
+
+    updateAdminStatus(adminStatus);
+  };
+
+  </script>
 
 {% endif %}

@@ -4,7 +4,7 @@ from flask import redirect, render_template, url_for
 
 from characters.character import RoleType
 from logger import log_info
-from player import PlayerStatus
+from player import PlayerStatus, PlayerVoteStatus
 from utils import get_state_description
 
 

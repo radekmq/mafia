@@ -12,6 +12,7 @@ class RoleType(Enum):
     OUTSIDER = "outsider"
     MINION = "minion"
     DEMON = "demon"
+    DEAD = "dead"
 
 
 @dataclass
@@ -19,10 +20,13 @@ class Ability:
     """Class representing an ability."""
 
     description: str
-    # Returns a rendered lambda function for the character's ability night page
+    # Returns a rendered page for the character's ability introduction page
+    effect_introduction: Optional[Callable[..., str]] = None
+    # Returns a rendered page for the character's ability night page
     effect_night_minion: Optional[Callable[..., str]] = None
+    # Returns a rendered page for the character's ability night page that is shown to all players
     effect_night_all_players: Optional[Callable[..., str]] = None
-    # Handle Handle callback for the character's ability, called when the player submits their night action
+    # Handle callback for the character's ability, called when the player submits their night action
     callback_night: Optional[Callable[..., str]] = None
     # Optional setup function for the character's ability, called once at the start of the game
     setup: Optional[Callable[..., str]] = None

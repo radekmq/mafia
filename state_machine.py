@@ -10,6 +10,7 @@ from player import PlayerStatus
 from state_machine_utils import assign_random_characters, log_players_status_table
 from utils import EventIDGenerator, get_minion_action_status, log_dicts_table
 from voting import VotingSystem
+from characters.character_details.dead import DeadCharacter
 
 
 class ClocktowerGame:
@@ -40,10 +41,11 @@ class ClocktowerGame:
         """Handle on enter players introduction."""
         log_info("[SM on enter] Przedstawienie ról graczy")
         self.game_state.game_ongoing = True
+        self.game_state.players.sort(key=lambda p: p.seat_no) # sortowanie graczy według numeru miejsca
         assign_random_characters(self.game_state)
         for player in self.game_state.players:
             if player.character is not None:
-                player.character.ability.setup(self)
+                player.character.ability.setup(self, player)
         log_players_status_table(self.game_state)
 
     def on_enter_night_minion_action(self):
@@ -88,7 +90,7 @@ class ClocktowerGame:
             winner_id = player_winner.client_id
             executed = self.game_state.get_player_by_client_id(winner_id)
             executed.alive = PlayerStatus.DEAD
-            executed.character = None
+            executed.character = DeadCharacter()
             log_info(f"Player executed: {executed.name} (client_id: {winner_id})")
             self.game_state.executed_player_name = (
                 f"Tej nocy miasto wyeliminowało gracza: {executed.name}"
@@ -126,7 +128,7 @@ class ClocktowerGame:
         log_info("[SM on exit] Wszystkie akcje nocne zakończone")
         for player in self.game_state.players:
             if player.character is not None:
-                player.character.ability.on_night_exit(self)
+                player.character.ability.on_night_exit(self, player)
                 player.reset_admin_confirmation()
                 player.reset_minion_confirmation()
 

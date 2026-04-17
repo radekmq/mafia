@@ -29,27 +29,21 @@ class Player:
         client_id: int,
         seat_no: int,
         name: str,
-        character: Character | None = None,
-        alive: PlayerStatus = PlayerStatus.ALIVE,
-        poisoned: bool = False,
-        drunk: bool = False,
-        protected: bool = False,
-        additional_characters: list[Character] | None = None,
         is_admin: bool = False,
     ):
         """Handle init."""
         self.name = name
-        self.character = character
-        self.alive = alive
-        self.poisoned = poisoned
-        self.drunk = drunk
-        self.protected = protected
-        self.additional_characters = additional_characters or []
-        self.is_admin = is_admin
         self.seat_no = seat_no
         self.client_id = client_id
-
+        self.is_admin = is_admin
+        
         # Internal parameters
+        self.character = None
+        self.alive = PlayerStatus.ALIVE
+        self.poisoned = False
+        self.drunk = False
+        self.protected = False
+        self.additional_characters = []
         self.player_status = None
         self.vote_status = PlayerVoteStatus.NOT_VOTED
         self.night_action_done = False
@@ -68,6 +62,8 @@ class Player:
         self.night_action_done = False
         self.admin_confirm_action = False
         self.minion_confirm_action = False
+        self.vote_status = PlayerVoteStatus.NOT_VOTED
+        self.character = None
 
     def set_vote_status(self, vote_status: PlayerVoteStatus):
         """Set vote status."""

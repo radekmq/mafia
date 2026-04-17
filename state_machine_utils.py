@@ -110,6 +110,7 @@ def assign_random_characters(game_state: GameState):
     def draw_from_pool(pool, count, pool_name):
         """Handle draw from pool."""
         available = [char for char in pool if char.route not in used_routes]
+        log_info(f"Drawing {count} character(s) from available pool '{available}'.")
         if len(available) < count:
             log_error(
                 "Za mało postaci w puli "
@@ -127,8 +128,17 @@ def assign_random_characters(game_state: GameState):
     # 1. Demon(y)
     demons = draw_from_pool(pool_demons, no_of_demons, "demon")
     assigned.extend(demons)
+    
+    # 2. Outsiderzy
+    outsiders = draw_from_pool(pool_outsiders, no_of_outsiders, "outsider")
+    assigned.extend(outsiders)
+    
+    # 2a. Dla Pijaka losujemy dodatkową postać z Townsfolk bez powtórek.
+    drunk_fake_role = None
+    if any(char.route == "pijak" for char in outsiders):
+        drunk_fake_role = draw_from_pool(pool_townsfolk, 1, "townsfolk (dla Pijaka)")[0]
 
-    # 2. Trzy dodatkowe postacie dla Impa z Townsfolk/Outsider bez powtórek.
+    # 3. Trzy dodatkowe postacie dla Impa z Townsfolk/Outsider bez powtórek.
     if no_of_demons > 0:
         demon_extra_pool = [
             char
@@ -148,18 +158,10 @@ def assign_random_characters(game_state: GameState):
         for char in demon_additional:
             used_routes.add(char.route)
 
-    # 3. Minion(y)
+    # 4. Minion(y)
     minions = draw_from_pool(pool_minions, no_of_minions, "minion")
     assigned.extend(minions)
 
-    # 4. Outsiderzy
-    outsiders = draw_from_pool(pool_outsiders, no_of_outsiders, "outsider")
-    assigned.extend(outsiders)
-
-    # 4a. Dla Pijaka losujemy dodatkową postać z Townsfolk bez powtórek.
-    drunk_fake_role = None
-    if any(char.route == "pijak" for char in outsiders):
-        drunk_fake_role = draw_from_pool(pool_townsfolk, 1, "townsfolk (dla Pijaka)")[0]
 
     # 5. Mieszkańcy
     townsfolk = draw_from_pool(pool_townsfolk, no_of_townsfolk, "townsfolk")
@@ -186,7 +188,7 @@ def assign_random_characters(game_state: GameState):
             player.additional_characters = list(demon_additional)
             demon_extras_assigned = True
 
-        if character.route == "pijak":
+        if character.name == "Pijak":
             player.drunk = True
             if drunk_fake_role and not drunk_assigned:
                 player.additional_characters.append(drunk_fake_role)

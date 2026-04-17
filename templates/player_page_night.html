@@ -5,15 +5,15 @@
 {% block content %}
 
   <div class="container" style="overflow-x:auto;">
-  <h3 style="text-align: center; margin-top: 0;">Twoja postać: {{ role_name }}</h3>
+  <h3 style="text-align: center; margin-top: 0;">Twoja postać: {{ character_data.role_name }}</h3>
 
   <table id="playerRoleTable" cellspacing="0" cellpadding="8">
     <tr>
       <td style="text-align:center; vertical-align:middle; padding:0;">
-        <a data-key="player_link" href="wiki/{{ player_link }}">
+        <a data-key="player_link" href="wiki/{{ character_data.player_link }}">
           <img
             data-key="player_image"
-            src="{{ url_for('static', filename='images/' ~ player_image) }}"
+            src="{{ url_for('static', filename='images/' ~ character_data.player_image) }}"
             style="
               display:block;
               margin: 0 auto;
@@ -23,7 +23,7 @@
             ">
         </a>
       </td>
-      <td data-key="player_info" style="width:70%; vertical-align:top; white-space: pre-line;">{{ player_info }}</td>
+      <td data-key="player_info" style="width:70%; vertical-align:top; white-space: pre-line;">{{ character_data.player_info }}</td>
     </tr>
 
     {% set show_player_status = True %}

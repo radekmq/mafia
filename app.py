@@ -17,7 +17,6 @@ from utils_render import (
     render_execution_page,
     render_game_over_page,
     render_inactive_page,
-    render_introduction_page,
     render_nomination_page,
     render_voting_page,
 )
@@ -197,10 +196,12 @@ def state_players_introduction():
     if not player.character:
         log_info("Player without character in player_introduction, reject player!")
         return redirect(url_for("game_ongoing"))
+    
+    ret_status = CLOCKTOWER_GAME.game_state.get_current_player().character.ability.effect_introduction(
+        CLOCKTOWER_GAME
+    )
 
-    log_info(f"Player image: {player.character.image_path}")
-
-    return render_introduction_page(CLOCKTOWER_GAME)
+    return ret_status
 
 
 @app.route("/night_selection", methods=["POST"])

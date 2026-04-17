@@ -18,10 +18,6 @@ def render_player_page(ct_game, template_name: str, data: dict):
     # Default rendering if no specific character effect is defined
     return render_template(
         template_name,
-        role_name=current_player.character.name,
-        player_link=current_player.character.route,
-        player_image=current_player.character.image_path,
-        player_info=current_player.character.ability.description,
         player_name=current_player.name,
         game_state_description=get_state_description(ct_game.state),
         is_admin=current_player.is_admin,
@@ -46,32 +42,6 @@ def render_player_page(ct_game, template_name: str, data: dict):
         minion_confirmed_action=current_player.is_minion_action_confirmed()
         if ct_game.state in ["night_minion_action"]
         else None,
-    )
-
-
-def render_introduction_page(ct_game):
-    """Render introduction page."""
-    current_player = ct_game.game_state.get_current_player()
-    if not current_player:
-        log_info("No current player found for rendering player page.")
-        return redirect(url_for("index"))
-
-    return render_template(
-        "player_page_night.html",
-        role_name=current_player.character.name,
-        player_link=current_player.character.route,
-        player_image=current_player.character.image_path,
-        player_info=current_player.character.ability.description,
-        player_name=current_player.name,
-        game_state_description=get_state_description(ct_game.state),
-        is_admin=current_player.is_admin,
-        player_seat=current_player.seat_no,
-        game_state=ct_game.state,
-        is_alive=current_player.alive == PlayerStatus.ALIVE,
-        player_status_list=[
-            (player.name, player.alive == PlayerStatus.ALIVE)
-            for player in ct_game.game_state.players
-        ],
     )
 
 

@@ -4,7 +4,21 @@ from characters.character import Ability, Character, RoleType
 from logger import log_info
 from player import PlayerStatus
 from utils_render import render_inactive_page, render_player_page
+from characters.character_details.dead import DeadCharacter
 
+
+def ability_effect_introduction(ct_game):
+    current_player = ct_game.game_state.get_current_player()
+    if not current_player:
+        log_info("No current player found for Imp's ability introduction effect.")
+        return render_inactive_page(ct_game)
+
+    return render_player_page(ct_game, "player_page_night.html", {
+        "role_name": current_player.character.name,
+        "player_link": current_player.character.route,
+        "player_image": current_player.character.image_path,
+        "player_info": current_player.character.ability.description,
+    })
 
 def ability_effect_night_minion(ct_game):
     return render_inactive_page(ct_game)
@@ -82,6 +96,10 @@ def effect_night_all_players(ct_game):
         ct_game,
         "characters/imp/page_night.html",
         {
+            "role_name": current_player.character.name,
+            "player_link": current_player.character.route,
+            "player_image": current_player.character.image_path,
+            "player_info": current_player.character.ability.description,
             "allow_imp_night_action": night_action_allowed,
             "player_list": player_list,
             "imp_status": current_player.character.imp_night_status,
@@ -173,6 +191,10 @@ def ability_callback(ct_game, data, replace_demon=False):
             ct_game,
             "characters/imp/page_replace_demon.html",
             {
+                "role_name": current_player.character.name,
+                "player_link": current_player.character.route,
+                "player_image": current_player.character.image_path,
+                "player_info": current_player.character.ability.description,
                 "player_list": player_list,
             },
         )
@@ -180,7 +202,7 @@ def ability_callback(ct_game, data, replace_demon=False):
     return effect_night_all_players(ct_game)
 
 
-def ability_setup(ct_game):
+def ability_setup(ct_game, player):
     """Configure for the Imp's ability."""
     # There is no Configure for the Imp's ability
     player = ct_game.game_state.get_player_by_character_name("Imp")
@@ -190,7 +212,7 @@ def ability_setup(ct_game):
     player.character.first_night_action_done = False
 
 
-def on_night_exit(ct_game):
+def on_night_exit(ct_game, player):
     """Handle actions to perform when the night phase ends for the Imp."""
     # There are no specific actions to perform when the night phase ends for the Imp
     log_info("Imp's on_night_exit called.")
@@ -216,7 +238,7 @@ def on_night_exit(ct_game):
             nominated_to_replace.additional_characters = (
                 nominated_to_die.additional_characters
             )
-            nominated_to_die.character = None
+            nominated_to_die.character = DeadCharacter()
             nominated_to_die.additional_characters = []
 
         ct_game.game_state.nominated_by_imp_to_die = None
@@ -229,6 +251,7 @@ imp_ability = Ability(
         "Jeśli w ten sposób zabijesz samego siebie, jeden z Minionów "
         "staje się Impem. Imp zabija jednego gracza każdej nocy."
     ),
+    effect_introduction=ability_effect_introduction,
     effect_night_minion=ability_effect_night_minion,
     effect_night_all_players=effect_night_all_players,
     callback_night=ability_callback,

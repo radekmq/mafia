@@ -9,6 +9,7 @@ from characters.character_details.imp import ImpCharacter
 from characters.character_details.kucharz import KucharzCharacter
 from characters.character_details.praczka import PraczkaCharacter
 from characters.character_details.truciciel import TrucicielCharacter
+from characters.character_details.pijak import PijakCharacter
 
 DB_CHARACTERS = {
     # # ====== MIESZKAŃCY ======
@@ -16,7 +17,7 @@ DB_CHARACTERS = {
     "bibliotekarka": BibliotekarkaCharacter(),
     "detektyw": DetektywCharacter(),
     "kucharz": KucharzCharacter(),
-    # "empata": EmpataCharacter(),
+    "empata": EmpataCharacter(),
     # "jasnowidz": JasnowidzCharacter(),
     # "grabarz": GrabarzCharacter(),
     # "mnich": MnichCharacter(),
@@ -26,7 +27,7 @@ DB_CHARACTERS = {
     # "zolniez": ZolnierzCharacter(),
     # "burmistrz": BurmistrzCharacter(),
     # ====== OUTSIDER ======
-    # "pijak": PijakCharacter(),
+    "pijak": PijakCharacter(),
     # "swiety": SwietyCharacter(),
     # "lokaj": LokajCharacter(),
     # ====== MINIONKI ======

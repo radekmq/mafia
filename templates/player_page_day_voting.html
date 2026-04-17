@@ -26,6 +26,10 @@
   >Trwa głosowanie, poczekaj na swój ruch ...</p>
 </div></br>
 
+{% else %}
+  <p style="text-align: center; font-size: 1.2em;">Twój głos został zapisany.</p>
+{% endif %}
+
 <div class="container" style="overflow-x:auto;">
   <h3 style="text-align: center; margin-top: 0;">
     Aktualny status głosowania:
@@ -47,10 +51,6 @@
     </tbody>
   </table>
 </div>
-
-{% else %}
-  <p style="text-align: center; font-size: 1.2em;">Twój głos został zapisany.</p>
-{% endif %}
 {% endblock %}
 
 {% block scripts %}

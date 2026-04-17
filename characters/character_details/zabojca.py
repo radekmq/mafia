@@ -9,11 +9,11 @@ def ability_callback(ct_game, data: dict):
     """Handle callback for the Zabójca's ability."""
 
 
-def ability_setup(ct_game):
+def ability_setup(ct_game, player):
     """Configure for the Zabójca's ability."""
 
 
-def on_night_exit(ct_game):
+def on_night_exit(ct_game, player):
     """Handle actions to perform when the night phase ends for the Zabójca."""
 
 

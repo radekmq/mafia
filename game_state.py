@@ -4,6 +4,7 @@
 from flask import session
 
 from player import Player
+from logger import log_info
 
 
 # pylint: disable=too-many-instance-attributes,too-many-arguments,too-many-positional-arguments
@@ -84,9 +85,19 @@ class GameState:
 
     def get_player_by_character_name(self, character_name: str) -> Player | None:
         """Handle get player by character name."""
+        log_info(f"Searching for player with character {character_name}.")
         for player in self.players:
             if player.character and player.character.name == character_name:
+                log_info(f"Found player {player.name} with character {character_name}.")
                 return player
+            
+        # Let's try if pijak is in additional characters
+        log_info(f"Trying to find player with character {character_name} in additional characters for Pijak. ")
+        for player in self.players:
+            if player.character and player.character.name == "Pijak":
+                if player.additional_characters and player.additional_characters[0].name == character_name:
+                    log_info(f"Found player {player.name} with character {character_name} in additional characters for Pijak.")
+                    return player
         return None
 
     def get_player_name(self, client_id: str) -> str | None:

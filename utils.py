@@ -1,11 +1,170 @@
 """Module for handling utility functions and classes in the Mafia game."""
-from functools import wraps
+import random
 from threading import Lock
 
-from flask import redirect, session, url_for
-
 from characters.character import RoleType
-from logger import log_info
+from logger import log_error, log_info
+
+
+# pylint: disable=too-many-locals
+def log_players_status_table(game_state):
+    """Handle log players status table."""
+    players = list(game_state.players)
+    if not players:
+        log_info("Brak graczy do wyświetlenia w tabeli statusu.")
+        return
+
+    headers = [
+        "Nazwa gracza",
+        "Seat",
+        "Postać",
+        "Dodatkowe postaci",
+        "Pijany",
+        "Poisoned",
+        "Alive",
+        "Protected",
+    ]
+
+    rows = []
+    for player in players:
+        character_name = player.character.name if player.character else "-"
+        additional = (
+            ", ".join(char.name for char in (player.additional_characters or [])) or "-"
+        )
+        drunk = "TAK" if player.drunk else "NIE"
+        poisoned = "TAK" if player.poisoned else "NIE"
+        protected = "TAK" if player.protected else "NIE"
+        alive = (
+            player.alive.value.upper()
+            if hasattr(player.alive, "value")
+            else str(player.alive)
+        )
+
+        rows.append(
+            [
+                player.name,
+                player.seat_no,
+                character_name,
+                additional,
+                drunk,
+                poisoned,
+                alive,
+                protected,
+            ]
+        )
+
+    widths = [len(header) for header in headers]
+    for row in rows:
+        for index, value in enumerate(row):
+            widths[index] = max(widths[index], len(str(value)))
+
+    def format_row(values):
+        """Handle format row."""
+        return (
+            "| "
+            + " | ".join(
+                str(value).ljust(widths[index]) for index, value in enumerate(values)
+            )
+            + " |"
+        )
+
+    separator = "+-" + "-+-".join("-" * width for width in widths) + "-+"
+
+    table_lines = [separator, format_row(headers), separator]
+    for row in rows:
+        table_lines.append(format_row(row))
+    table_lines.append(separator)
+
+    log_info("Status graczy:\n" + "\n".join(table_lines))
+
+
+# pylint: disable=too-many-locals,too-many-statements
+def assign_random_characters(list_of_players, scenario_setup):
+    """Assign random, unique characters to players based on scenario setup."""
+    number_of_players = len(list_of_players)
+    if number_of_players == 0:
+        log_error("Nie można przypisać postaci: brak graczy.")
+        return
+
+    setup_for_player_count = next(
+        (
+            row
+            for row in scenario_setup.trouble_brewing_setup
+            if row.get("liczba_graczy") == number_of_players
+        ),
+        None,
+    )
+
+    if setup_for_player_count is None:
+        message = (
+            "Brak konfiguracji Trouble Brewing dla liczby graczy: "
+            f"{number_of_players}."
+        )
+        log_error(message)
+        raise ValueError(message)
+
+    role_requirements = {
+        RoleType.TOWNSFOLK: setup_for_player_count.get("Mieszkańcy", 0),
+        RoleType.OUTSIDER: setup_for_player_count.get("Outsiderzy", 0),
+        RoleType.MINION: setup_for_player_count.get("Minionki", 0),
+        RoleType.DEMON: setup_for_player_count.get("Demon", 0),
+    }
+
+    required_characters_count = sum(role_requirements.values())
+    if required_characters_count != number_of_players:
+        message = (
+            "Niepoprawna konfiguracja scenariusza: liczba postaci "
+            f"({required_characters_count}) nie zgadza się z liczbą graczy "
+            f"({number_of_players})."
+        )
+        log_error(message)
+        raise ValueError(message)
+
+    scenario_setup.reset_setup()
+
+    selected_characters = []
+    for role_type, required_count in role_requirements.items():
+        available_characters = scenario_setup.get_list_of_characters_by_type(
+            role_type, available_only=True
+        )
+
+        if len(available_characters) < required_count:
+            message = (
+                "Za mało dostępnych postaci typu "
+                f"{role_type.value}: wymagane {required_count}, dostępne "
+                f"{len(available_characters)}."
+            )
+            log_error(message)
+            raise ValueError(message)
+
+        selected_characters.extend(random.sample(available_characters, required_count))
+
+    if len({character.character.name for character in selected_characters}) != len(
+        selected_characters
+    ):
+        message = "Wylosowano zduplikowane postaci."
+        log_error(message)
+        raise ValueError(message)
+
+    random.shuffle(selected_characters)
+
+    for player, character in zip(list_of_players, selected_characters):
+        player.character = character.character
+        character.assigned_in_play += 1
+
+    rows = []
+    for player in list_of_players:
+        rows.append(
+            {
+                "Gracz": player.name,
+                "Postać": player.character.name if player.character else "-",
+                "Typ postaci": (
+                    player.character.role_type.value if player.character else "-"
+                ),
+            }
+        )
+
+    log_dicts_table(rows, title="Rozlosowane postaci")
 
 
 class EventIDGenerator:
@@ -26,75 +185,6 @@ class EventIDGenerator:
         """Zwraca aktualny event_id bez zwiększania."""
         with self._lock:
             return self._value
-
-
-def require_state(required_states):
-    """Handle require state."""
-
-    if isinstance(required_states, str):
-        required_states = [required_states]
-
-    def decorator(f):
-        @wraps(f)
-        def wrapper(*args, **kwargs):
-            """Handle wrapper."""
-            log_info(f"Validate required states: {required_states}")
-            from state_machine import CLOCKTOWER_GAME
-
-            current_state = CLOCKTOWER_GAME.state
-
-            if current_state not in required_states:
-                # przekierowanie do właściwego endpointu
-                return redirect(url_for(f"state_{current_state}"))
-
-            return f(*args, **kwargs)
-
-        return wrapper
-
-    return decorator
-
-
-def user_in_play(f):
-    """Ensure the current user belongs to the active game before entering a view."""
-
-    @wraps(f)
-    def wrapper(*args, **kwargs):
-        """Handle wrapper."""
-        log_info("Validate if user is in play.")
-        from state_machine import CLOCKTOWER_GAME
-
-        client_id = session.get("client_id")
-        player = CLOCKTOWER_GAME.game_state.get_player_by_client_id(client_id)
-
-        if not (client_id and player):
-            if CLOCKTOWER_GAME.game_state.game_ongoing:
-                log_info(
-                    "User in ongoing game without client_id, redirect to game_ongoing."
-                )
-                return redirect(url_for("game_ongoing"))
-            log_info("User in game without client_id, redirect to index.")
-            return redirect(url_for("index"))
-
-        return f(*args, **kwargs)
-
-    return wrapper
-
-
-def get_state_description(game_state):
-    """Handle get state description."""
-    descriptions = {
-        "lobby": "Lobby – oczekiwanie na graczy",
-        "players_introduction": "Wprowadzenie postaci",
-        "night_minion_action": "NOC – akcja minionów",
-        "night_all_players_action": "NOC – akcje wszystkich graczy",
-        "night_summary": "NOC – podsumowanie nocy",
-        "day_discussions": "DZIEŃ – dyskusja",
-        "nomination": "DZIEŃ - nominacja",
-        "voting": "DZIEŃ - głosowanie",
-        "execution": "DZIEŃ - egzekucja",
-        "game_over": "Koniec gry",
-    }
-    return descriptions[game_state]
 
 
 def get_minion_action_status(ct_game):
@@ -171,3 +261,20 @@ def log_dicts_table(rows, title: str = "Tabela danych"):
 
     table_lines = [title, separator, header_row, separator, *data_rows, separator]
     log_info("\n".join(table_lines))
+
+
+def get_state_description(game_state):
+    """Handle get state description."""
+    descriptions = {
+        "lobby": "Lobby – oczekiwanie na graczy",
+        "players_introduction": "Wprowadzenie postaci",
+        "night_actions": "NOC: Akcje graczy",
+        "night_resolving_actions": "NOC: Rozpatrzenie akcji",
+        "night_summary": "NOC: Podsumowanie",
+        "day_discussions": "DZIEŃ: Dyskusja",
+        "nomination": "DZIEŃ: Nominacja",
+        "voting": "DZIEŃ: Głosowanie",
+        "execution": "DZIEŃ: Egzekucja",
+        "game_over": "Koniec gry",
+    }
+    return descriptions.get(game_state, "Nieznany stan")

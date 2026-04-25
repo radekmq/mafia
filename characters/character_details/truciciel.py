@@ -1,143 +1,203 @@
-import json
-
-from characters.character import Ability, Character, RoleType
+from characters.character import Ability, Character, DualEffect, RenderPage, RoleType
+from game_events import Event
 from logger import log_info
 from player import PlayerStatus
-from utils_render import render_inactive_page, render_player_page
+
+# = = = = = = = = = = = = =  RENDER PAGE = = = = = = = = = = = = =
 
 
-def ability_effect_introduction(ct_game):
-    current_player = ct_game.game_state.get_current_player()
-    if not current_player:
-        log_info("No current player found for Truciciel's ability introduction effect.")
-        return render_inactive_page(ct_game)
+def render_introduction(game_engine, current_player):
+    """Render effect of the Truciciels's ability during the introduction phase."""
+    player_character = current_player.character
+    return {
+        "screen": "players_introduction",
+        "character_data": {
+            "role_name": player_character.name,
+            "player_link": player_character.route,
+            "player_image": player_character.image_path,
+            "player_info": player_character.description,
+        },
+    }
 
-    return render_player_page(ct_game, "player_page_night.html", {
-        "role_name": current_player.character.name,
-        "player_link": current_player.character.route,
-        "player_image": current_player.character.image_path,
-        "player_info": current_player.character.ability.description,
-    })
 
-
-def ability_effect_night_minion(ct_game):
-    """Effect of the Truciciel's ability."""
+def render_night_action(game_engine, current_player):
+    """Render effect of the Truciciel's ability during the night action phase."""
     log_info("Truciciel's ability effect for night_minion_action called.")
-    current_player = ct_game.game_state.get_current_player()
+    player_character = current_player.character
 
-    if current_player is None:
-        log_info("No current player found for Truciciel's ability effect.")
-        return "No current player found."
-
+    truciciel_status = "Już wykonałeś swoją nocną akcję!"
     if (
-        ct_game.state != "night_all_players_action"
-        and ct_game.state != "night_minion_action"
+        current_player.is_night_action_done()
+        or current_player.alive == PlayerStatus.DEAD
     ):
-        log_info("Truciciel's ability effect called outside of night_action state.")
-        return render_inactive_page(ct_game)
+        log_info("Current player has already completed their night action or is dead.")
+        screen_content = "truciciel_action_completed"
+        truciciel_status = "Potwierdziłeś swoją nocną akcję lub ona nie działa."
+    else:
+        log_info("Rendering Truciciel's night action page.")
+        screen_content = "select_player_to_poison"
+        truciciel_status = "Wybierz gracza, którego chcesz otruc tej nocy."
 
     player_list = []
-    for player in ct_game.game_state.players:
-        if (
-            player.alive == PlayerStatus.ALIVE
-            and player.client_id != current_player.client_id
-        ):
-            is_minion = (
-                ", Minion" if player.character.role_type == RoleType.MINION else ""
-            )
-            is_demon = ", Demon" if player.character.role_type == RoleType.DEMON else ""
-            player_list.append(
-                (
-                    f"{player.name} (miejsce: {player.seat_no}{is_minion}{is_demon})",
-                    player.client_id,
+    if screen_content == "select_player_to_poison":
+        for player in game_engine.game_state.players:
+            if player.alive == PlayerStatus.ALIVE:
+                if player.character is None:
+                    continue
+                is_minion = (
+                    ", Minion" if player.character.role_type == RoleType.MINION else ""
                 )
-            )
+                is_demon = (
+                    ", Demon" if player.character.role_type == RoleType.DEMON else ""
+                )
+                player_list.append(
+                    (
+                        f"{player.name} (miejsce: {player.seat_no}{is_minion}{is_demon})",
+                        player.client_id,
+                    )
+                )
     log_info(f"Player list for Truciciel's ability effect: {player_list}")
 
     list_of_minions = [
         player.name
-        for player in ct_game.game_state.players
-        if player.character and player.character.role_type == RoleType.MINION
+        for player in game_engine.game_state.players
+        if player.character is not None
+        and player.character.role_type == RoleType.MINION
     ]
     if not list_of_minions:
         list_of_minions = ["Brak Minionów w grze"]
 
-    demon = [
-        player.name
-        for player in ct_game.game_state.players
-        if player.character and player.character.role_type == RoleType.DEMON
-    ]
-
-    return render_player_page(
-        ct_game,
-        "characters/truciciel/page_night.html",
-        {
-            "role_name": current_player.character.name,
-            "player_link": current_player.character.route,
-            "player_image": current_player.character.image_path,
-            "player_info": current_player.character.ability.description,
-            "allow_truciciel_night_action": not current_player.night_action_done,
+    return {
+        "screen": "night_truciciel",
+        "character_data": {
+            "role_name": player_character.name,
+            "player_link": player_character.route,
+            "player_image": player_character.image_path,
+            "player_info": player_character.description,
+            "screen_content": screen_content,
             "player_list": player_list,
-            "truciciel_status": current_player.character.truciciel_night_status,
-            "demon": demon[0] if demon else None,
-            "minions": ", ".join(list_of_minions),
+            "truciciel_status": truciciel_status,
+            "truciciel_minions": ", ".join(list_of_minions),
         },
+    }
+
+
+def render_night_resolution(game_engine, current_player):
+    """Effect of the Truciciel's ability during night_all_players_action state."""
+    log_info(f"Truciciel's ability: {current_player.player_status}.")
+    player_character = current_player.character
+    list_of_minions = [
+        player.name
+        for player in game_engine.game_state.players
+        if player.character is not None
+        and player.character.role_type == RoleType.MINION
+    ]
+    if not list_of_minions:
+        list_of_minions = ["Brak Minionów w grze"]
+    player_status = "Zleciłeś otrucie gracza. Nocna akcja została wykonana."
+    if current_player.alive == PlayerStatus.DEAD:
+        player_status = "Niestety Twoja zdolność już nie działa."
+
+    return {
+        "screen": "night_truciciel",
+        "character_data": {
+            "role_name": player_character.name,
+            "player_link": player_character.route,
+            "player_image": player_character.image_path,
+            "player_info": player_character.description,
+            "screen_content": "truciciel_action_completed",
+            "player_list": [],
+            "truciciel_status": player_status,
+            "truciciel_minions": ", ".join(list_of_minions),
+        },
+    }
+
+
+# = = = = = = = = = = = = =  ABILITY EFFECTS = = = = = = = = = = = = =
+
+
+def ability_setup(data):
+    """Configure for the Truciciel's ability."""
+    log_info("Truciciel does not need setup.")
+
+
+def ability_callback_poison(data):
+    """Handle callback for the Truciciel's ability."""
+    player_id, game_state, game_setup, callback_data = (
+        data["actor_id"],
+        data["game_state"],
+        data["game_setup"],
+        data["callback_data"],
     )
+    log_info(f"Truciciel's ability callback called with data: {callback_data}")
+    game_state.set_nominated_to_poison(callback_data.get("selected_player"))
+    player = game_state.get_player_by_client_id(player_id)
+    event = Event(
+        name="confirm_night_action",
+        actor_id=player.client_id,
+        priority=50,
+    )
+    return [event]
 
 
-def ability_callback(ct_game, data):
+def ability_night_resolution_original(data):
     """Handle callback for the Truciciel's ability."""
     log_info(f"Truciciel's ability callback called with data: {data}")
+    player, game_state, game_setup = (
+        data["target"],
+        data["game_state"],
+        data["game_setup"],
+    )
 
-    try:
-        selected_json = json.loads(data.get("selected_json", "[]"))
-    except json.JSONDecodeError:
-        selected_json = []
+    player_to_poison = game_state.nominated_to_poison
 
-    log_info(f"Player nominated by Truciciel to poison: {selected_json}")
+    if player_to_poison is None:
+        log_info("No player nominated to poison.")
+        return []
 
-    current_player = ct_game.game_state.get_current_player()
-    current_player.night_action_done = True
-    poisoned_character = ct_game.game_state.get_player_by_client_id(selected_json[0])
-    poisoned_character.poisoned = True
+    player_to_poison.set_poisoned(True)
+    return []
+
+
+def ability_night_resolution_fake(data):
+    log_info(f"Truciciel's fake ability callback called with data: {data}")
+    player, game_state, game_setup = (
+        data["target"],
+        data["game_state"],
+        data["game_setup"],
+    )
     log_info(
-        f"Gracz otruty: {poisoned_character.name if poisoned_character else 'None'}"
+        "This is a fake night resolution for the Truciciel, no actual game state changes will occur."
     )
-    current_player.character.truciciel_night_status = (
-        f"\nGracz {poisoned_character.name} został otruty."
-    )
-    current_player.confirm_minion_action()
-    return ability_effect_night_minion(ct_game)
+    return []
 
 
-def ability_setup(ct_game, player):
-    """Configure for the Truciciel's ability."""
-
-
-def on_night_exit(ct_game, player):
-    """Handle actions to perform when the night phase ends for the Truciciel."""
-    log_info("Truciciel's on_night_exit called.")
-
-    player = ct_game.game_state.get_player_by_character_name("Truciciel")
-    if player is None:
-        return
-
-    player.night_action_done = False
-    player.character.truciciel_night_status = None
-
-
-char_ability = Ability(
-    description=(
-        "Każdej nocy wybierz gracza: tej nocy i następnego dnia "
-        "ten gracz jest zatruty. Truciciel potajemnie zakłóca "
-        "działanie zdolności postaci."
+ability = Ability(
+    setup=DualEffect(
+        original=ability_setup,
     ),
-    effect_introduction=ability_effect_introduction,
-    effect_night_minion=ability_effect_night_minion,
-    effect_night_all_players=ability_effect_night_minion,
-    callback_night=ability_callback,
-    setup=ability_setup,
-    on_night_exit=on_night_exit,
+    night_resolution=DualEffect(
+        original=ability_night_resolution_original,
+        fake=ability_night_resolution_fake,
+    ),
+)
+ability.callback_poison = DualEffect(
+    original=ability_callback_poison,
+)
+
+
+render_page = RenderPage(
+    introduction=DualEffect(
+        original=render_introduction,
+    ),
+    night_action=DualEffect(
+        original=render_night_action,
+        fake=render_night_action,
+    ),
+    night_resolution=DualEffect(
+        original=render_night_resolution,
+        fake=render_night_resolution,
+    ),
 )
 
 
@@ -150,9 +210,13 @@ class TrucicielCharacter(Character):
         super().__init__(
             name="Truciciel",
             role_type=RoleType.MINION,
-            ability=char_ability,
+            ability=ability,
+            render_page=render_page,
             image_path="truciciel.png",
             route="truciciel",
         )
 
-        self.truciciel_night_status = None
+        self.description = (
+            "Każdej nocy wybierz gracza: ten gracz jest zatruty tej nocy "
+            "oraz następnego dnia."
+        )

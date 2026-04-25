@@ -4,90 +4,55 @@ import logging
 import os
 from logging.handlers import RotatingFileHandler
 
-from flask import has_request_context, session
 
+class FileLogger:
+    def __init__(self, name="app_logger"):
+        """Handle init."""
+        self.logger = logging.getLogger(name)
+        self.game_state = None  # To be set later by the state machine
 
-def _get_clocktower_game():
-    """Import the game singleton lazily to avoid circular imports."""
-    from state_machine import CLOCKTOWER_GAME
+        # żeby nie dodawać handlerów wiele razy
+        if self.logger.handlers:
+            return
 
-    return CLOCKTOWER_GAME
+        self.logger.setLevel(logging.INFO)
 
+        # folder na logi
+        os.makedirs("logs", exist_ok=True)
 
-# Ignore logging for /api/state endpoint to reduce noise in logs
-# pylint: disable=too-few-public-methods
-class IgnoreApiState(logging.Filter):
-    """Logging filter to ignore /api/state endpoint logs."""
+        # handler do pliku (rotacja!)
+        file_handler = RotatingFileHandler(
+            "logs/game_server.log", maxBytes=1_000_000, backupCount=3  # 1 MB
+        )
 
-    def filter(self, record):
-        """Handle filter."""
-        return "/api/state" not in record.getMessage()
+        formatter = logging.Formatter(
+            "%(asctime)s [%(levelname)s] %(name)s: %(message)s"
+        )
+        file_handler.setFormatter(formatter)
 
+        self.logger.addHandler(file_handler)
 
-def get_logger(name="app_logger"):
-    """Handle get logger."""
-    logger = logging.getLogger(name)
+    def log_info(self, message: str, *args):
+        """Handle log info."""
+        self.logger.info(message, *args)
 
-    # żeby nie dodawać handlerów wiele razy
-    if logger.handlers:
-        return logger
-
-    logger.setLevel(logging.INFO)
-
-    # folder na logi
-    os.makedirs("logs", exist_ok=True)
-
-    # handler do pliku (rotacja!)
-    file_handler = RotatingFileHandler(
-        "logs/game_server.log", maxBytes=1_000_000, backupCount=3  # 1 MB
-    )
-
-    formatter = logging.Formatter("%(asctime)s [%(levelname)s] %(name)s: %(message)s")
-    file_handler.setFormatter(formatter)
-
-    logger.addHandler(file_handler)
-
-    return logger
-
-
-def log_info(message: str):
-    """Handle log info."""
-    if has_request_context():
-        client_id = session.get("client_id")
-    else:
-        client_id = None
-
-    player_name = (
-        _get_clocktower_game().game_state.get_player_name(client_id)
-        if client_id
-        else None
-    )
-    if player_name:
-        LOGGER.info("[%s] %s", player_name, message)
-    else:
-        LOGGER.info("[Unknown player] %s", message)
-
-
-def log_error(message: str):
-    """Handle log error."""
-    if has_request_context():
-        client_id = session.get("client_id")
-    else:
-        client_id = None
-
-    player_name = (
-        _get_clocktower_game().game_state.get_player_name(client_id)
-        if client_id
-        else None
-    )
-    if player_name:
-        LOGGER.error("[%s] %s", player_name, message)
-    else:
-        LOGGER.error("[Unknown player] %s", message)
+    def log_error(self, message: str, *args):
+        """Handle log error."""
+        self.logger.error(message, *args)
 
 
 # =========================
 # INICJALIZACJA
 # =========================
 
-LOGGER = get_logger()
+LOGGER = FileLogger()
+
+
+def log_info(message: str, *args):
+    """Handle log info."""
+    LOGGER.log_info(message, *args)
+
+
+def log_error(message: str, *args):
+    """Handle log error."""
+    LOGGER.log_error(message, *args)

@@ -1,0 +1,41 @@
+<!DOCTYPE html>
+<html lang="pl">
+<head>
+  <meta charset="UTF-8">
+  <title>BOTC</title>
+
+  <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@400;500;600&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/base.css') }}">
+</head>
+
+<body>
+
+  <div id="admin_panel"></div></br>
+<div id="game_status"></div></br>
+<div id="game_content"></div></br>
+
+
+<script src="/static/socket.io.min.js"></script>
+<script src="/static/game/bootstrap.js"></script>
+<script src="/static/game/components/status.js"></script>
+<script src="/static/game/components/game_status.js"></script>
+<script src="/static/game/components/admin_status.js"></script>
+<script src="/static/game/renderer.js"></script>
+<script src="/static/game/components/choice.js"></script>
+<script src="/static/game/screens/player_intro.js"></script>
+<script src="/static/game/screens/night_basic.js"></script>
+<script src="/static/game/screens/day.js"></script>
+<script src="/static/game/screens/lobby.js"></script>
+<script src="/static/game/screens/game_over.js"></script>
+
+<!-- Character-specific scripts -->
+<script src="/static/game/screens/characters/night_imp.js"></script>
+<script src="/static/game/screens/characters/night_truciciel.js"></script>
+<script src="/static/game/screens/characters/night_jasnowidz.js"></script>
+<script src="/static/game/screens/characters/night_lokaj.js"></script>
+
+<script src="/static/game/socket.js"></script>
+<script src="/static/game/core.js"></script>
+
+</body>
+</html>

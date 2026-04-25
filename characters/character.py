@@ -2,7 +2,9 @@
 
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import Callable, Optional
+from typing import Any, Callable, Optional
+
+from logger import LOGGER
 
 
 class RoleType(Enum):
@@ -16,22 +18,46 @@ class RoleType(Enum):
 
 
 @dataclass
-class Ability:
-    """Class representing an ability."""
+class DualEffect:
+    original: Optional[Callable[..., Any]] = None
+    fake: Optional[Callable[..., Any]] = None
+    name: str = "unknown_effect"  # opcjonalnie do logów
 
-    description: str
-    # Returns a rendered page for the character's ability introduction page
-    effect_introduction: Optional[Callable[..., str]] = None
-    # Returns a rendered page for the character's ability night page
-    effect_night_minion: Optional[Callable[..., str]] = None
-    # Returns a rendered page for the character's ability night page that is shown to all players
-    effect_night_all_players: Optional[Callable[..., str]] = None
-    # Handle callback for the character's ability, called when the player submits their night action
-    callback_night: Optional[Callable[..., str]] = None
-    # Optional setup function for the character's ability, called once at the start of the game
-    setup: Optional[Callable[..., str]] = None
-    # Optional function called when the night phase ends
-    on_night_exit: Optional[Callable[..., str]] = None
+    def __call__(self, *args, is_fake: bool = False, **kwargs):
+        fn = self.fake if is_fake else self.original
+
+        if fn is None:
+            LOGGER.log_info(
+                f"[Ability] {self.name} - Niezaimplementowana funkcja "
+                f"(is_fake={is_fake})"
+            )
+            return None
+
+        return fn(*args, **kwargs)
+
+
+@dataclass
+class Ability:
+    night_action: DualEffect = field(
+        default_factory=lambda: DualEffect(name="night_action")
+    )
+    setup: DualEffect = field(default_factory=lambda: DualEffect(name="setup"))
+    night_resolution: DualEffect = field(
+        default_factory=lambda: DualEffect(name="night_resolution")
+    )
+
+
+@dataclass
+class RenderPage:
+    introduction: DualEffect = field(
+        default_factory=lambda: DualEffect(name="introduction")
+    )
+    night_action: DualEffect = field(
+        default_factory=lambda: DualEffect(name="night_action")
+    )
+    night_resolution: DualEffect = field(
+        default_factory=lambda: DualEffect(name="night_resolution")
+    )
 
 
 @dataclass
@@ -40,6 +66,8 @@ class Character:
 
     name: str
     role_type: RoleType
-    ability: Ability = field(repr=False)
     image_path: str
     route: str
+    ability: Ability = field(repr=False)
+    render_page: RenderPage = field(repr=False)
+    description: Optional[str] = None

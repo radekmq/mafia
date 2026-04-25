@@ -1,122 +1,213 @@
 import random
 
-from characters.character import Ability, Character, RoleType
+from characters.character import Ability, Character, DualEffect, RenderPage, RoleType
 from logger import log_info
 from player import PlayerStatus
-from utils_render import render_inactive_page, render_player_page
+
+# = = = = = = = = = = = = =  UTILITIES = = = = = = = = = = = = =
 
 
-def ability_effect_introduction(ct_game):
-    current_player = ct_game.game_state.get_current_player()
-    if not current_player:
-        log_info("No current player found for Empata's ability introduction effect.")
-        return render_inactive_page(ct_game)
-    
-    player_character = current_player.character
-    if current_player.drunk:
-        player_character = current_player.additional_characters[0]
-
-    return render_player_page(ct_game, "player_page_night.html", {
-        "role_name": player_character.name,
-        "player_link": player_character.route,
-        "player_image": player_character.image_path,
-        "player_info": player_character.ability.description,
-    })
-
-def ability_effect_night_minion(ct_game):
-    """Effect of the Empata's ability."""
-    return render_inactive_page(ct_game)
-
-
-def effect_night_all_players(ct_game):
-    """Effect of the Empata's ability during night_all_players_action state."""
-    log_info("# # # # Setting up Empata's ability. # # # #")
-    current_player = ct_game.game_state.get_current_player()
-    log_info(f"Empata's ability: {current_player.player_status}.")
-
-    players_in_seat_order = ct_game.game_state.players
+def count_evil_alive_neighbors(player, game_state):
+    """Count evil characters among Empata's closest alive neighbors."""
+    alive_neighbors = get_alive_neighbors(player, game_state)
 
     evil_roles = {RoleType.MINION, RoleType.DEMON}
     evil_neighbors_count = 0
+    for neighbor in alive_neighbors:
+        if (
+            neighbor
+            and neighbor.character
+            and neighbor.character.role_type in evil_roles
+        ):
+            evil_neighbors_count += 1
 
-    if current_player in players_in_seat_order:
-        current_index = players_in_seat_order.index(current_player)
-        players_count = len(players_in_seat_order)
+    return evil_neighbors_count
 
-        def find_alive_neighbor(step):
-            for offset in range(1, players_count):
-                candidate = players_in_seat_order[(current_index + step * offset) % players_count]
-                if candidate.alive == PlayerStatus.ALIVE:
-                    return candidate
-            return None
 
-        left_neighbor = find_alive_neighbor(-1)
-        right_neighbor = find_alive_neighbor(1)
-
-        for neighbor in [left_neighbor, right_neighbor]:
-            if (
-                neighbor
-                and neighbor.character
-                and neighbor.character.role_type in evil_roles
-            ):
-                evil_neighbors_count += 1
-
-    if current_player.drunk or current_player.poisoned:
-        log_info("Empata is drunk or poisoned, false information will be provided.")
-        evil_count_faked = random.randint(0, 2)
-        
-        if evil_count_faked == evil_neighbors_count:
-            log_info("Random evil neighbors match actual evil neighbors, we try to randomize again.")
-            evil_count_faked = random.randint(0, 2)
-        evil_neighbors_count = evil_count_faked
-    
-    player_status = (
-        "Empata wie, że wśród jego sąsiadów jest "
-        f"{evil_neighbors_count} złych postaci (Minion lub Demon)"
+def get_alive_neighbors(player, game_state):
+    """Get Empata's closest alive neighbors on both sides."""
+    players_in_seat_order = sorted(
+        [candidate for candidate in game_state.players if candidate.character],
+        key=lambda candidate: candidate.seat_no,
     )
-    current_player.player_status = player_status
+
+    if player not in players_in_seat_order or len(players_in_seat_order) < 2:
+        return (None, None)
+
+    current_index = players_in_seat_order.index(player)
+    players_count = len(players_in_seat_order)
+
+    def find_alive_neighbor(step):
+        for offset in range(1, players_count):
+            candidate = players_in_seat_order[
+                (current_index + step * offset) % players_count
+            ]
+            if candidate.alive == PlayerStatus.ALIVE:
+                return candidate
+        return None
+
+    return (find_alive_neighbor(-1), find_alive_neighbor(1))
+
+
+def get_alive_neighbors_cache_key(player, game_state):
+    """Build a stable cache key from Empata's current alive neighbors."""
+    return tuple(
+        neighbor.client_id if neighbor else None
+        for neighbor in get_alive_neighbors(player, game_state)
+    )
+
+
+def set_player_status(player, evil_neighbors_count):
+    """Set Empata's information text."""
+    player.player_status = (
+        "Empata wie, że liczba złych postaci (Minion lub Demon) "
+        f"wśród jego żywych sąsiadów wynosi: {evil_neighbors_count}"
+    )
+
+
+# = = = = = = = = = = = = =  RENDER PAGE = = = = = = = = = = = = =
+
+
+def render_introduction(game_engine, current_player):
+    """Render effect of the Empata's ability during the introduction phase."""
+    log_info("Get data for Empata introduction.")
 
     player_character = current_player.character
     if current_player.drunk:
         player_character = current_player.additional_characters[0]
 
-    return render_player_page(
-        ct_game,
-        "characters/empata/page_night.html",
-        {
+    return {
+        "screen": "players_introduction",
+        "character_data": {
             "role_name": player_character.name,
             "player_link": player_character.route,
             "player_image": player_character.image_path,
-            "player_info": player_character.ability.description,
-            "player_status": player_status,
+            "player_info": player_character.description,
         },
+    }
+
+
+def render_night_action(game_engine, current_player):
+    """Render Empata's night action confirmation."""
+    log_info("Get data for Empata night action.")
+
+    screen_content = "confirm_night_action"
+    player_status = "Potwierdź swoją nocną akcję."
+    if (
+        current_player.is_night_action_done()
+        or current_player.alive == PlayerStatus.DEAD
+    ):
+        log_info("Current player has already completed their night action or is dead.")
+        screen_content = "action_completed"
+        player_status = "Potwierdziłeś swoją nocną akcję lub ona nie działa."
+
+    player_character = current_player.character
+    if current_player.drunk:
+        player_character = current_player.additional_characters[0]
+
+    return {
+        "screen": "night_basic",
+        "character_data": {
+            "role_name": player_character.name,
+            "player_link": player_character.route,
+            "player_image": player_character.image_path,
+            "player_info": player_character.description,
+            "player_status": player_status,
+            "screen_content": screen_content,
+        },
+    }
+
+
+def render_night_resolution(game_engine, current_player):
+    """Render Empata's information after night resolution."""
+    log_info("Get data for Empata night resolution.")
+
+    player_character = current_player.character
+    if current_player.drunk:
+        player_character = current_player.additional_characters[0]
+    if (
+        current_player.alive == PlayerStatus.DEAD
+        and game_engine.game_state.nominated_by_imp_to_die is not current_player
+    ):
+        player_status = "Niestety Twoja zdolność już nie działa."
+    else:
+        player_status = current_player.player_status
+
+    return {
+        "screen": "night_basic",
+        "character_data": {
+            "role_name": player_character.name,
+            "player_link": player_character.route,
+            "player_image": player_character.image_path,
+            "player_info": player_character.description,
+            "player_status": player_status,
+            "screen_content": "action_completed",
+        },
+    }
+
+
+# = = = = = = = = = = = = =  ABILITY EFFECTS = = = = = = = = = = = = =
+
+
+def ability_night_resolution_original(data):
+    """Resolve Empata's true night information."""
+    log_info("# # # # Resolving Empata's ability. # # # #")
+    player, game_state, _game_setup = (
+        data["target"],
+        data["game_state"],
+        data["game_setup"],
     )
 
-
-def ability_callback(ct_game, data: dict):
-    """Handle callback for the Empata's ability."""
-
-
-def ability_setup(ct_game, player):
-    """Configure for the Empata's ability."""
+    evil_neighbors_count = count_evil_alive_neighbors(player, game_state)
+    set_player_status(player, evil_neighbors_count)
+    return evil_neighbors_count
 
 
-def on_night_exit(ct_game, player):
-    """Handle actions to perform when the night phase ends for the Empata."""
+def ability_night_resolution_fake(data):
+    """Resolve Empata's false night information."""
+    log_info("Empata is drunk or poisoned, false information will be provided.")
+    player, game_state, _game_setup = (
+        data["target"],
+        data["game_state"],
+        data["game_setup"],
+    )
+
+    evil_neighbors_count = count_evil_alive_neighbors(player, game_state)
+    false_counts = [count for count in range(3) if count != evil_neighbors_count]
+
+    cache_key = get_alive_neighbors_cache_key(player, game_state)
+    fake_results_cache = getattr(player, "empata_fake_results", {})
+
+    if cache_key not in fake_results_cache:
+        fake_results_cache[cache_key] = random.choice(false_counts)
+        player.empata_fake_results = fake_results_cache
+
+    evil_neighbors_count = fake_results_cache[cache_key]
+
+    set_player_status(player, evil_neighbors_count)
+    return evil_neighbors_count
 
 
-char_ability = Ability(
-    description=(
-        "Po każdej nocy Empata dowiaduje się, ilu z jego dwóch "
-        "żyjących sąsiadów jest złych. Empata uczy się, "
-        "czy sąsiadujący z nim gracze są dobrzy czy źli."
+ability = Ability(
+    night_resolution=DualEffect(
+        original=ability_night_resolution_original,
+        fake=ability_night_resolution_fake,
+    )
+)
+
+render_page = RenderPage(
+    introduction=DualEffect(
+        original=render_introduction,
+        fake=render_introduction,
     ),
-    effect_introduction=ability_effect_introduction,
-    effect_night_minion=ability_effect_night_minion,
-    effect_night_all_players=effect_night_all_players,
-    callback_night=ability_callback,
-    setup=ability_setup,
-    on_night_exit=on_night_exit,
+    night_action=DualEffect(
+        original=render_night_action,
+        fake=render_night_action,
+    ),
+    night_resolution=DualEffect(
+        original=render_night_resolution,
+        fake=render_night_resolution,
+    ),
 )
 
 
@@ -129,7 +220,14 @@ class EmpataCharacter(Character):
         super().__init__(
             name="Empata",
             role_type=RoleType.TOWNSFOLK,
-            ability=char_ability,
+            ability=ability,
+            render_page=render_page,
             image_path="empata.png",
             route="empata",
+        )
+
+        self.description = (
+            "Po każdej nocy Empata dowiaduje się, ilu z jego dwóch "
+            "żyjących sąsiadów jest złych. Empata uczy się, "
+            "czy sąsiadujący z nim gracze są dobrzy czy źli."
         )

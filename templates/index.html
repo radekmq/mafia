@@ -102,21 +102,24 @@
           })
         });
 
-        const data = await response.json();
+        if (response.redirected) {
+          window.location.href = response.url;
+          return;
+        }
+
+        let data = {};
+        const contentType = response.headers.get("content-type") || "";
+        if (contentType.includes("application/json")) {
+          data = await response.json();
+        }
 
         if (!response.ok) {
           errorMsg.textContent = data.error || "Wystąpił błąd";
           return;
         }
 
-        // Sukces — możesz np. przekierować
-        if (data.url) {
-          localStorage.setItem("lastEventId", data.event_id);
-          window.location.href = data.url;
-        } else {
-          errorMsg.style.color = "green";
-          errorMsg.textContent = "Zapisano pomyślnie!";
-        }
+        errorMsg.style.color = "green";
+        errorMsg.textContent = "Zapisano pomyślnie!";
 
       } catch (err) {
         errorMsg.textContent = "Błąd połączenia z serwerem";

@@ -1,72 +1,111 @@
-import json
+import random
 
-from characters.character import Ability, Character, RoleType
+from characters.character import Ability, Character, DualEffect, RenderPage, RoleType
 from logger import log_info
-from player import PlayerStatus
-from utils_render import render_inactive_page, render_player_page
+
+# = = = = = = = = = = = = =  RENDER PAGE = = = = = = = = = = = = =
 
 
-def ability_effect_introduction(ct_game):
-    current_player = ct_game.game_state.get_current_player()
-    if not current_player:
-        log_info("No current player found for Pijak's ability introduction effect.")
-        return render_inactive_page(ct_game)
-    
-    if not current_player.additional_characters:
-        log_info("No additional characters found for Pijak's ability introduction effect.")
-        return render_inactive_page(ct_game)
-    
+def render_introduction(game_engine, current_player):
+    """Render effect of the Pijak's ability during the introduction phase."""
+    log_info("Get data for Pijak introduction.")
     drunk_character = current_player.additional_characters[0]
-
-    return render_player_page(ct_game, "player_page_night.html", {
-        "role_name": drunk_character.name,
-        "player_link": drunk_character.route,
-        "player_image": drunk_character.image_path,
-        "player_info": drunk_character.ability.description,
-    })
-
-def effect_night_all_players(ct_game):
-    """Effect of the Pijak's ability."""
-    log_info("Pijak's ability effect_night_all_players called, forwarding to additional character's ability effect.")
-    current_player = ct_game.game_state.get_current_player()
-    return current_player.additional_characters[0].ability.effect_night_all_players(ct_game)
-    
-def ability_effect_night_minion(ct_game):
-    """Effect of the Pijak's ability."""
-    log_info("Pijak's ability effect_night_minion called, forwarding to additional character's ability effect.")
-    current_player = ct_game.game_state.get_current_player()
-    return current_player.additional_characters[0].ability.effect_night_minion(ct_game)
+    return drunk_character.render_page.introduction(
+        game_engine, current_player, is_fake=True
+    )
 
 
-def ability_callback(ct_game, data: dict):
-    """Handle callback for the Pijak's ability."""
-    log_info("Pijak's ability callback called, forwarding to additional character's ability callback.")
-    current_player = ct_game.game_state.get_current_player()
-    return current_player.additional_characters[0].ability.callback_night(ct_game, data)
+def render_night_action(game_engine, current_player):
+    """Render effect of the Pijak's ability during the night action phase."""
+    log_info("Get data for Pijak night action.")
+    drunk_character = current_player.additional_characters[0]
+    return drunk_character.render_page.night_action(
+        game_engine, current_player, is_fake=True
+    )
 
 
-def ability_setup(ct_game, player):
+def render_night_resolution(game_engine, current_player):
+    """Render effect of the Pijak's ability during the night resolution phase."""
+    log_info("Get data for Pijak night resolution.")
+    drunk_character = current_player.additional_characters[0]
+    return drunk_character.render_page.night_resolution(
+        game_engine, current_player, is_fake=True
+    )
+
+
+# = = = = = = = = = = = = =  ABILITY EFFECTS = = = = = = = = = = = = =
+
+
+def ability_setup(data):
     """Configure for the Pijak's ability."""
-    log_info("Setting up Pijak's ability forwarding to additional character's ability.")
-    return player.additional_characters[0].ability.setup(ct_game, player)
+    player = data["target"]
+    game_setup = data["game_setup"]
+    list_of_available_good_chars = game_setup.get_list_of_characters_by_type(
+        RoleType.TOWNSFOLK, available_only=True
+    )
+    if len(list_of_available_good_chars) < 1:
+        raise ValueError(
+            "Not enough Townsfolk characters available for Pijak's ability setup."
+        )
+    random_townsfolk = random.sample(list_of_available_good_chars, 1)
+    random_character = random_townsfolk[0].character
+    player.additional_characters = [random_character]
+    random_townsfolk[0].assigned_in_play += 1
+    log_info(
+        f"Pijak's ability setup: assigned additional characters to Pijak: {random_character.name}"
+    )
+    player.drunk = True
+    return random_character.ability.setup(data, is_fake=True)
 
 
-def on_night_exit(ct_game, player):
-    """Handle actions to perform when the night phase ends for the Pijak."""
-    return player.additional_characters[0].ability.on_night_exit(ct_game, player)
+def ability_night_action(data):
+    """Effect of the Pijak's ability."""
+    log_info(
+        "Pijak's night action called, forwarding to additional character's ability effect."
+    )
+    current_player = data["target"]
+    return current_player.additional_characters[0].ability.night_action(
+        data, is_fake=True
+    )
 
 
-char_ability = Ability(
-    description=(
-        "Nie wiesz, że jesteś Pijakiem. Myślisz, że jesteś "
-        "postacią z grupy Townsfolk, ale nią nie jesteś."
+def ability_night_resolution(data):
+    """Effect of the Pijak's ability during the night resolution phase."""
+    log_info(
+        "Pijak's night resolution called, forwarding to additional character's ability effect."
+    )
+    current_player = data["target"]
+    return current_player.additional_characters[0].ability.night_resolution(
+        data, is_fake=True
+    )
+
+
+ability = Ability(
+    setup=DualEffect(
+        original=ability_setup,
     ),
-    effect_introduction=ability_effect_introduction,
-    effect_night_minion=ability_effect_night_minion,
-    effect_night_all_players=effect_night_all_players,
-    callback_night=ability_callback,
-    setup=ability_setup,
-    on_night_exit=on_night_exit,
+    night_action=DualEffect(
+        original=ability_night_action,
+        fake=ability_night_action,
+    ),
+    night_resolution=DualEffect(
+        original=ability_night_resolution,
+        fake=ability_night_resolution,
+    ),
+)
+
+render_page = RenderPage(
+    introduction=DualEffect(
+        original=render_introduction,
+    ),
+    night_action=DualEffect(
+        original=render_night_action,
+        fake=render_night_action,
+    ),
+    night_resolution=DualEffect(
+        original=render_night_resolution,
+        fake=render_night_resolution,
+    ),
 )
 
 
@@ -79,7 +118,14 @@ class PijakCharacter(Character):
         super().__init__(
             name="Pijak",
             role_type=RoleType.OUTSIDER,
-            ability=char_ability,
+            ability=ability,
+            render_page=render_page,
             image_path="pijak.png",
             route="pijak",
+        )
+
+        self.description = (
+            "Zaczynasz grę wiedząc, że 1 z 2 graczy jest konkretną postacią Mieszczanina. "
+            "Praczka dowiaduje się, że dana postać Mieszczanina jest w grze, "
+            "ale nie wie, który gracz ją posiada."
         )

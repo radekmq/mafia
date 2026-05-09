@@ -1,0 +1,43 @@
+{% extends "base.html" %}
+
+{% block title %}Pustelnik{% endblock %}
+
+{% block content %}
+
+<div style="overflow-x:auto;" class="container">
+  <h3>Pustelnik</h3>
+
+  <button type="button" onclick="window.location.href='{{ back_url }}'">Wróć do listy postaci</button>
+  <button type="button" onclick="window.location.href='/lobby'">Wróć do gry</button>
+
+  <table>
+    <tr><td style="text-align: center;">
+      <img style="width: 40%; height: auto;" src="{{ url_for('static', filename='images/pustelnik.png') }}">
+    </td></tr>
+    <tr>
+      <td>
+        Możesz być rozpoznawany jako zły oraz jako Minion lub Demon, nawet jeśli jesteś martwy.
+        Pustelnik może wyglądać na złą postać, ale w rzeczywistości jest dobry.
+
+        <ul>
+          <li>Za każdym razem, gdy wykrywane jest nastawienie (alignment) Pustelnika, Narrator decyduje, czy Pustelnik jest rozpoznawany jako dobry czy zły.</li>
+          <li>Za każdym razem, gdy Pustelnik jest celem zdolności działającej na konkretnych Minionów lub Demonów, Narrator decyduje, czy Pustelnik jest rozpoznawany jako ten konkretny Minion lub Demon.</li>
+          <li>Pustelnik może być rozpoznawany jako dobry albo zły, lub jako Outsider, Minion albo Demon, w różnych momentach tej samej nocy. Narrator wybiera to, co jest najbardziej interesujące.</li>
+          <li>Pustelnik rozpoznawany jako konkretny Minion lub Demon nie posiada zdolności tej postaci. Na przykład Pustelnik rozpoznawany jako Poisoner nie budzi się w nocy i nie może zatruwać graczy.</li>
+        </ul>
+      </td>
+    </tr>
+  </table>
+
+  <blockquote>Zabójca używa swojej zdolności na Pustelinka. Narrator decyduje, że Pustelnik jest rozpoznawany jako Imp, więc Pustelnik umiera. Zabójca wierzy, że właśnie zabił Impa.</blockquote>
+
+  <blockquote>Empata, który siedzi obok Pustelnika i Monk, dowiaduje się, że sąsiaduje z jednym złym graczem. Następnej nocy Empata dowiaduje się, że nie sąsiaduje z żadnym złym graczem.</blockquote>
+
+  <blockquote>Detektyw dowiaduje się, że albo Pustelnik, albo Święty jest Skarlet.</blockquote>
+
+  <blockquote>Pustelnik zostaje stracony. Grabarz dowiaduje się, że stracony został Imp.</blockquote>
+  
+  <blockquote>Pustelnik siedzi obok Impa oraz złego Podróżnika (Evil Traveller). Ponieważ pokazanie „2” Kucharzowi mogłoby zdradzić zbyt wiele informacji, Kucharz otrzymuje zamiast tego prawdziwą informację — „0”.</blockquote>
+</div>
+
+{% endblock %}

@@ -1,0 +1,40 @@
+{% extends "base.html" %}
+
+{% block title %}Bibliotekarka{% endblock %}
+
+{% block content %}
+
+<div style="overflow-x:auto;" class="container">
+  <h3>Bibliotekarka</h3>
+
+  <button type="button" onclick="window.location.href='{{ back_url }}'">Wróć do listy postaci</button>
+  <button type="button" onclick="window.location.href='/lobby'">Wróć do gry</button>
+
+  <table>
+    <tr><td style="text-align: center;">
+      <img style="width: 40%; height: auto;" src="{{ url_for('static', filename='images/bibliotekarka.png') }}">
+    </td></tr>
+    <tr>
+      <td>
+        Na początku wiesz, że 1 z 2 graczy jest konkretnym Outsiderem (lub że żaden nie jest w grze).
+        Bibliotekarka dowiaduje się, że konkretny Outsider jest w grze, ale nie kto go gra.
+
+        <ul>
+          <li>Podczas pierwszej nocy Bibliotekarka dowiaduje się, że jeden z dwóch graczy jest konkretnym Outsiderem.</li>
+          <li>Informację tę poznaje tylko raz i później nie otrzymuje żadnych dodatkowych wskazówek.</li>
+          <li>Pijak jest Outsiderem. Jeśli Bibliotekarka dowie się, że jeden z dwóch graczy to Pijak, nie dowie się, jaką rolę uważa za swoją postać Pijak.</li>
+        </ul>
+      </td>
+    </tr>
+  </table>
+
+  <blockquote>Benjamin jest Świętym, a Filip jest Baronem. Bibliotekarka dowiaduje się, że Benjamin lub Filip jest Świętym.</blockquote>
+
+  <blockquote>W tej grze nie ma żadnych Outsiderów. Bibliotekarka dowiaduje się '0'.</blockquote>
+
+  <blockquote>Abdallah jest Pijakiem, który uważa, że jest Mnichem, a Douglas jest Kantorem. Bibliotekarka dowiaduje się, że Abdallah lub Douglas jest Pijakiem.
+  (Dzieje się tak, ponieważ Bibliotekarka dowiaduje się prawdziwej postaci. Pijak to prawdziwa postać Abdallaha, nie Mnicha.)</blockquote>
+
+</div>
+
+{% endblock %}

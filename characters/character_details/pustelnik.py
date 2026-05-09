@@ -102,8 +102,8 @@ class SwietyCharacter(Character):
 
         self.description = (
             (
-                "Jeśli zostaniesz stracony w wyniku egzekucji, twoja drużyna przegrywa. "
-                "Święty (Saint) kończy grę porażką swojej drużyny, jeśli zostanie stracony."
+                "Możesz być rozpoznawany jako zły oraz jako Minion lub Demon, nawet jeśli jesteś martwy. "
+                "Pustelnik może wyglądać na złą postać, ale w rzeczywistości jest dobry."
             ),
         )
 

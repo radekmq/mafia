@@ -1,0 +1,39 @@
+{% extends "base.html" %}
+
+{% block title %}Mnich{% endblock %}
+
+{% block content %}
+
+<div style="overflow-x:auto;" class="container">
+  <h3>Mnich</h3>
+
+  <button type="button" onclick="window.location.href='{{ back_url }}'">Wróć do listy postaci</button>
+  <button type="button" onclick="window.location.href='/lobby'">Wróć do gry</button>
+
+  <table>
+    <tr><td style="text-align: center;">
+      <img style="width: 40%; height: auto;" src="{{ url_for('static', filename='images/mnich.png') }}">
+    </td></tr>
+    <tr>
+      <td>
+        Każdej nocy wybierz gracza (nie siebie): tej nocy jest on bezpieczny przed Demonem.
+        Mnich (Monk) chroni innych graczy przed Demonem.
+
+        <ul>
+          <li>Każdej nocy, z wyjątkiem pierwszej, Mnich może wybrać dowolnego gracza (oprócz siebie), którego chce chronić.</li>
+          <li>Jeśli Demon zaatakuje gracza chronionego przez Mnicha, ten gracz nie ginie. Demon nie wykonuje wtedy dodatkowego ataku — po prostu tej nocy nie ma żadnej śmierci.</li>
+          <li>Mnich nie chroni przed egzekucją spowodowaną nominacją przez Demona.</li>
+        </ul>
+      </td>
+    </tr>
+  </table>
+
+  <blockquote>Mnich chroni Wróżbitkę (Fortune Teller). Imp atakuje Wróżbitkę. Tej nocy nikt nie ginie.</blockquote>
+
+  <blockquote>Mnich chroni Burmistrza (Mayor), a Imp atakuje Burmistrza. Zdolność Burmistrza („zamiast ciebie może zginąć inny gracz”) nie aktywuje się, ponieważ Burmistrz jest bezpieczny przed Demonem. Tej nocy nikt nie ginie.</blockquote>
+
+  <blockquote>Mnich chroni Impa. Imp próbuje tej nocy zabić samego siebie, ale nic się nie dzieje. Imp pozostaje przy życiu i nie powstaje nowy Imp.</blockquote>
+
+</div>
+
+{% endblock %}

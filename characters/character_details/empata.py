@@ -159,6 +159,10 @@ def ability_night_resolution_original(data):
     )
 
     evil_neighbors_count = count_evil_alive_neighbors(player, game_state)
+    if evil_neighbors_count == 2:
+        player.character.detected_double_evil_zone = 1
+    if evil_neighbors_count == 1:
+        player.character.consistent_readings = 1
     set_player_status(player, evil_neighbors_count)
     return evil_neighbors_count
 
@@ -185,6 +189,8 @@ def ability_night_resolution_fake(data):
     evil_neighbors_count = fake_results_cache[cache_key]
 
     set_player_status(player, evil_neighbors_count)
+    player.character.consistent_readings = 0
+    player.character.detected_double_evil_zone = 0
     return evil_neighbors_count
 
 
@@ -231,3 +237,14 @@ class EmpataCharacter(Character):
             "żyjących sąsiadów jest złych. Empata uczy się, "
             "czy sąsiadujący z nim gracze są dobrzy czy źli."
         )
+        self.consistent_readings = 0.5
+        self.detected_double_evil_zone = 0
+
+    def evaluate_knowledge_score(self):
+        score = 0
+        score += self.consistent_readings * 2
+
+        if self.detected_double_evil_zone:
+            score += 5
+
+        return score

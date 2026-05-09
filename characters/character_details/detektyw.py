@@ -251,3 +251,8 @@ class DetektywCharacter(Character):
             "Detektyw dowiaduje się, że konkretny Minion jest w grze, "
             "ale nie kto go gra."
         )
+
+    def evaluate_knowledge_score(self):
+        """Evaluate knowledge score based on the information they have."""
+        score = 2.0
+        return score

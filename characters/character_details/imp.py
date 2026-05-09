@@ -194,9 +194,8 @@ def render_night_resolution(game_engine, current_player):
 
 def ability_setup(data):
     """Configure for the Imp's ability."""
-    player, game_state, game_setup = (
+    player, game_setup = (
         data["target"],
-        data["game_state"],
         data["game_setup"],
     )
     player.character.first_night = True
@@ -227,10 +226,9 @@ def ability_setup(data):
 
 def ability_callback_imp_kills(data):
     """Handle callback for the Imp's ability."""
-    player_id, game_state, game_setup, callback_data = (
+    player_id, game_state, callback_data = (
         data["actor_id"],
         data["game_state"],
-        data["game_setup"],
         data["callback_data"],
     )
     log_info(f"Imp's ability callback called with data: {callback_data}")
@@ -269,10 +267,9 @@ def ability_callback_imp_kills(data):
 def ability_callback_suicide(data):
     """Handle callback for the Imp's suicide."""
     log_info(f"Imp's ability callback called with data: {data}")
-    player_id, game_state, game_setup, callback_data = (
+    player_id, game_state, callback_data = (
         data["actor_id"],
         data["game_state"],
-        data["game_setup"],
         data["callback_data"],
     )
     player = game_state.get_player_by_client_id(player_id)
@@ -291,10 +288,9 @@ def ability_callback_suicide(data):
 def ability_night_resolution_original(data):
     """Handle callback for the Imp's ability."""
     log_info(f"Imp's ability callback called with data: {data}")
-    player, game_state, game_setup = (
+    player, game_state = (
         data["target"],
         data["game_state"],
-        data["game_setup"],
     )
 
     player_to_die = game_state.nominated_by_imp_to_die

@@ -206,3 +206,8 @@ class KucharzCharacter(Character):
             "Na początku wiesz, ile par złych graczy siedzi obok siebie. "
             "Kucharz wie, czy źli gracze siedzą obok siebie."
         )
+
+    def evaluate_knowledge_score(self):
+        """Evaluate knowledge score based on the information they have."""
+        score = 2.0
+        return score

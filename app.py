@@ -1,11 +1,11 @@
 # -*- coding: utf-8 -*-
 """Flask application entrypoint for the Mafia game."""
 
+import logging
+
 import eventlet
 
 eventlet.monkey_patch()
-
-import logging
 
 from flask import Flask, jsonify, redirect, render_template, request, session, url_for
 from flask_socketio import SocketIO

@@ -7,7 +7,7 @@ from uuid import uuid4
 from flask import session
 
 from logger import log_info
-from player import Player, PlayerStatus
+from player import Player
 from utils import get_state_description
 
 
@@ -154,10 +154,9 @@ class GameState:
             for player in self.players:
                 player.reset_status()
 
-
     def add_new_player(self, name, seat_no, moderator=False, password=None):
         is_admin = False
-        if moderator:# and password == "secret":
+        if moderator:  # and password == "secret":
             is_admin = True
 
         client_id = str(uuid4())
@@ -169,30 +168,32 @@ class GameState:
 
         with self.lock:
             self.players.append(player)
-        log_info(f"Saved player: {name}, seat: {seat_no}, moderator: {"TAK" if is_admin else "NIE"}")
-
+        log_info(
+            f"Saved player: {name}, seat: {seat_no}, moderator: {'TAK' if is_admin else 'NIE'}"
+        )
 
     def remove_player(self, client_id):
         if client_id:
             with self.lock:
                 self.players = [
-                    player
-                    for player in self.players
-                    if player.client_id != client_id
+                    player for player in self.players if player.client_id != client_id
                 ]
             log_info(f"Player left the game: {client_id}")
 
-
     def set_demon_replacement_candidate(self, player: Player | None):
         """Set demon replacement candidate."""
-        log_info(f"Setting demon replacement candidate: {player.name if player else 'None'}")
+        log_info(
+            f"Setting demon replacement candidate: {player.name if player else 'None'}"
+        )
         with self.lock:
             self.demon_replacement_candidate = player
 
     def set_nominated_by_imp_to_die(self, player: str | None):
         """Set nominated by imp to die."""
         player = self.get_player_by_client_id(player) if player else None
-        log_info(f"Setting nominated by Imp to die: {player.name if player else 'None'}")
+        log_info(
+            f"Setting nominated by Imp to die: {player.name if player else 'None'}"
+        )
         with self.lock:
             self.nominated_by_imp_to_die = player
 
@@ -210,9 +211,7 @@ class GameState:
             self.nominated_by_imp_to_die = None
             self.nominated_to_poison = None
 
-    def data_view_for_endpoint(
-        self, endpoint: str, player: Player, state
-    ) -> dict:
+    def data_view_for_endpoint(self, endpoint: str, player: Player, state) -> dict:
         """Get data view for endpoint."""
         with self.lock:
             players_alive_status = [
@@ -233,7 +232,9 @@ class GameState:
             data_view = {
                 "state_update": {
                     "phase": state,
-                    "screen": player.active_screen.get("screen", "lobby") if isinstance(player.active_screen, dict) else "lobby",
+                    "screen": player.active_screen.get("screen", "lobby")
+                    if isinstance(player.active_screen, dict)
+                    else "lobby",
                     "player_client_id": player.client_id,
                     "player_name": player.name,
                     "player_seat": player.seat_no,
@@ -243,8 +244,12 @@ class GameState:
                     "is_admin": player.is_administrator(),
                     "players_night_action_status": players_night_action,
                     "player_confirmed_action": player.is_night_action_done(),
-                    "character_data": player.active_screen.get("character_data", {}) if isinstance(player.active_screen, dict) else {},
-                    "voting_system": player.active_screen.get("voting_system", {}) if isinstance(player.active_screen, dict) else {},
+                    "character_data": player.active_screen.get("character_data", {})
+                    if isinstance(player.active_screen, dict)
+                    else {},
+                    "voting_system": player.active_screen.get("voting_system", {})
+                    if isinstance(player.active_screen, dict)
+                    else {},
                     "winning_team": self.winning_team,
                 },
             }
@@ -257,7 +262,9 @@ class GameState:
 
     def set_active_nominee_for_execution(self, player: Player | None):
         """Set active nominee for execution."""
-        log_info(f"Setting active nominee for execution: {player.name if player else 'None'}")
+        log_info(
+            f"Setting active nominee for execution: {player.name if player else 'None'}"
+        )
         with self.lock:
             self.active_nominee_for_execution = player
 
@@ -277,7 +284,6 @@ class GameState:
         with self.lock:
             return self.active_nominator
 
-
     def increment_voting_index(self):
         """Increment voting index."""
         with self.lock:
@@ -295,17 +301,19 @@ class GameState:
 
     def sort_players_from_seat(self, start_seat):
         return sorted(
-            self.players,
-            key=lambda p: (p.seat_no - start_seat) % len(self.players)
+            self.players, key=lambda p: (p.seat_no - start_seat) % len(self.players)
         )
 
     def set_voting_order(self, seat_no):
         """Set voting order based on nominator's seat number."""
         with self.lock:
             sorted_players = self.sort_players_from_seat(seat_no)
-            self.voting_order = [p for p in sorted_players if p.is_alive() or p.has_last_vote()]
-            log_info(f"Voting order set based on nominator's seat {seat_no}: {[p.name for p in self.voting_order]}")
-
+            self.voting_order = [
+                p for p in sorted_players if p.is_alive() or p.has_last_vote()
+            ]
+            log_info(
+                f"Voting order set based on nominator's seat {seat_no}: {[p.name for p in self.voting_order]}"
+            )
 
     def get_next_voter(self):
         """Get next voter."""
@@ -330,7 +338,9 @@ class GameState:
     def get_player_with_most_votes(self) -> Player | None:
         """Get player with most votes."""
         with self.lock:
-            nominated_players = [p for p in self.players if p.is_nominated_for_execution()]
+            nominated_players = [
+                p for p in self.players if p.is_nominated_for_execution()
+            ]
             if not nominated_players:
                 log_info("No nominated players to vote for.")
                 return None
@@ -339,15 +349,20 @@ class GameState:
             if max_votes == 0:
                 log_info("No votes cast for any nominated player.")
                 return None
-            players_with_max_votes = [p for p in nominated_players if p.number_of_votes == max_votes]
+            players_with_max_votes = [
+                p for p in nominated_players if p.number_of_votes == max_votes
+            ]
 
             if len(players_with_max_votes) == 1:
-                log_info(f"Player with most votes: {players_with_max_votes[0].name} with {max_votes} votes.")
+                log_info(
+                    f"Player with most votes: {players_with_max_votes[0].name} with {max_votes} votes."
+                )
                 return players_with_max_votes[0]
             else:
-                log_info(f"Tie between players: {[p.name for p in players_with_max_votes]} with {max_votes} votes each.")
+                log_info(
+                    f"Tie between players: {[p.name for p in players_with_max_votes]} with {max_votes} votes each."
+                )
                 return None
-
 
     def set_last_executed_player(self, player: Player | None):
         """Set last executed player."""
@@ -355,14 +370,29 @@ class GameState:
         with self.lock:
             self.last_executed_player = player
 
-    def get_nominated_players(self) -> list[dict]:
+    def get_nominated_players_dict(self) -> list[dict]:
         """Get nominated players."""
         with self.lock:
-            nominated_players = [p for p in self.players if p.is_nominated_for_execution()]
+            nominated_players = [
+                p for p in self.players if p.is_nominated_for_execution()
+            ]
             if not nominated_players:
                 log_info("No nominated players to vote for.")
                 return []
-            return [{"name": p.name, "votes": p.number_of_votes} for p in nominated_players]
+            return [
+                {"name": p.name, "votes": p.number_of_votes} for p in nominated_players
+            ]
+
+    def get_nominated_players(self) -> list:
+        """Get nominated players."""
+        with self.lock:
+            nominated_players = [
+                p for p in self.players if p.is_nominated_for_execution()
+            ]
+            if not nominated_players:
+                log_info("No nominated players to vote for.")
+                return []
+            return nominated_players
 
     def reset_voting_statuses(self):
         """Reset voting statuses for all players."""
@@ -375,8 +405,7 @@ class GameState:
     def get_list_of_voters_and_statuses(self) -> list[dict]:
         """Get list of voters and their statuses."""
         return [
-            {"name": p.name, "status": p.get_vote_status().value}
-            for p in self.players
+            {"name": p.name, "status": p.get_vote_status().value} for p in self.players
         ]
 
     def set_game_over_conditions_met(self, value: bool):

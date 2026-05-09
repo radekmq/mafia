@@ -38,12 +38,13 @@ def update_state_view(player, data, priority=99):
 
 
 class Dispatcher:
-    def __init__(self, game_state, state_machine, game_setup):
+    def __init__(self, game_state, state_machine, game_setup, winner_heuristic):
         self.event_queue = PriorityQueue()
         self.game_state = game_state
         self.state_machine = state_machine
         self.state_machine.register_dispatcher(self)
         self.game_setup = game_setup
+        self.winner_heuristic = winner_heuristic
         self.socketio: SocketIO | None = None
 
     def register_socketio(self, socketio: SocketIO):
@@ -242,7 +243,7 @@ class Dispatcher:
                 # Schedule night action events based on character abilities
                 priority = self.game_setup.effect_priorities.get(
                     "night_resolution", {}
-                ).get(player.character.name, 90)
+                ).get(player.character.name, 80)
                 event = Event(
                     name="player_night_resolution",
                     actor_id="SYSTEM",
@@ -262,6 +263,8 @@ class Dispatcher:
                 )
             # Log status and broadcast state at the end of night actions scheduling
             new_events.append(get_log_players_status_event())
+            event = Event(name="game_score", actor_id="SYSTEM", priority=101)
+            new_events.append(event)
 
         elif event.name == "player_night_resolution":
             player = event.target[0]
@@ -273,6 +276,9 @@ class Dispatcher:
             player.character.ability.night_resolution(
                 data, is_fake=(player.drunk or player.poisoned)
             )
+
+        elif event.name == "game_score":
+            self.winner_heuristic.evaluate_game_advantage()
 
         elif event.name == "enter_day_discussions":
             for player in self.game_state.players:
@@ -301,7 +307,7 @@ class Dispatcher:
                 new_events.append(new_event)
                 return new_events
 
-            nominated_players = self.game_state.get_nominated_players()
+            nominated_players = self.game_state.get_nominated_players_dict()
             for player in self.game_state.players:
                 voting_data = {
                     "screen": "day_nomination",
@@ -394,7 +400,7 @@ class Dispatcher:
                 )
                 log_info("No player was executed due to a tie or no votes.")
 
-            nominated_players = self.game_state.get_nominated_players()
+            nominated_players = self.game_state.get_nominated_players_dict()
             log_info(f"Nominated players for execution: {nominated_players}")
             self.game_state.reset_voting_statuses()
             for player in self.game_state.players:

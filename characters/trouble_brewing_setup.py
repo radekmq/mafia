@@ -159,8 +159,9 @@ class TroubleBrewingScenario(Scenario):
             },
             "night_actions": {},
             "night_resolution": {
+                # default: 80
                 "Truciciel": 10,
-                "Imp": 80,
+                "Imp": 90,
             },
         }
 
@@ -207,3 +208,31 @@ class TroubleBrewingScenario(Scenario):
             log_info("Game over conditions not fullfilled!")
 
         return []
+
+
+CHARACTER_POWER = {
+    # Townsfolk
+    "Praczka": 2,
+    "Bibliotekarka": 2,
+    "Detektyw": 2,
+    "Kucharz": 3,
+    "Empata": 4,
+    "Jasnowidz": 5,
+    "Grabarz": 5,
+    "Mnich": 3,
+    "Krukarz": 3,
+    "Dziewica": 4,
+    "Zabojca": 3,
+    "Żołnierz": 2,
+    "Burmistrz": 4,
+    # Outsiders
+    "Lokaj": -1,
+    "Pijak": -4,
+    "Święty": -5,
+    # Minions
+    "Truciciel": -5,
+    "Skarlet": -4,
+    "Baron": -4,
+    # Demon
+    "Imp": -6,
+}

@@ -36,7 +36,7 @@ class ZolnierzCharacter(Character):
         """Initialize the Żołnierz character."""
 
         super().__init__(
-            name="Żołnierz",
+            name="Zolnierz",
             role_type=RoleType.TOWNSFOLK,
             ability=char_ability,
             image_path="zolnierz.png",

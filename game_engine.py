@@ -1,13 +1,12 @@
-from flask import session, url_for
+from heuristic import WinnerHeuristic
 from transitions import Machine
 
 from characters.trouble_brewing_setup import TroubleBrewingScenario
 from dispatcher import Dispatcher
 from game_events import Event
 from game_state import GameState
-from logger import log_info
 from state_machine import StateMachine, states, transitions
-from utils import EventIDGenerator, get_minion_action_status, log_dicts_table
+from utils import EventIDGenerator
 
 
 class GameEngine:
@@ -21,9 +20,10 @@ class GameEngine:
         self.state_machine = StateMachine()
         self.game_setup = TroubleBrewingScenario()
         self.event_id_generator = EventIDGenerator()
+        self.winner_heuristic = WinnerHeuristic(self.game_state)
 
         self.dispatcher = Dispatcher(
-            self.game_state, self.state_machine, self.game_setup
+            self.game_state, self.state_machine, self.game_setup, self.winner_heuristic
         )
         self.page_config = {}
 

@@ -160,11 +160,7 @@ def ability_setup_fake(data):
 def ability_setup_original(data):
     """Configure for the Bibliotekarka's ability."""
     log_info("# # # # Setting up Bibliotekarka's ability. # # # #")
-    player, game_state, game_setup = (
-        data["target"],
-        data["game_state"],
-        data["game_setup"],
-    )
+    player, game_state = (data["target"], data["game_state"])
     players = game_state.players
     if player is None:
         return
@@ -252,3 +248,8 @@ class BibliotekarkaCharacter(Character):
             "(lub że żaden nie jest w grze). Bibliotekarka dowiaduje się, "
             "że konkretny Outsider jest w grze, ale nie kto go gra."
         )
+
+    def evaluate_knowledge_score(self):
+        """Evaluate knowledge score based on the information they have."""
+        score = 2.0
+        return score

@@ -254,3 +254,8 @@ class PraczkaCharacter(Character):
             "Praczka dowiaduje się, że dana postać Mieszczanina jest w grze, "
             "ale nie wie, który gracz ją posiada."
         )
+
+    def evaluate_knowledge_score(self):
+        """Evaluate knowledge score based on the information they have."""
+        score = 2.0
+        return score

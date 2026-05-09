@@ -144,12 +144,25 @@ def ability_night_resolution_original(data):
     ):
         selected_players = player.character.selected_players_to_see
         log_info(f"Jasnowidz selected players to see: {selected_players}")
-        player.jasnowidz_status = "Nie ma Demona wśród wskazanych przez Ciebie graczy."
+
+        is_deamon_found = False
         for selected_player_id in selected_players:
             target_player = game_state.get_player_by_client_id(selected_player_id)
             if target_player.character.role_type == RoleType.DEMON:
                 player.jasnowidz_status = "Wiesz, że wśród wskazanych przez Ciebie wybranych graczy jest Demon."
+                is_deamon_found = True
                 break
+
+        if is_deamon_found:
+            player.jasnowidz_status = (
+                "Wiesz, że wśród wskazanych przez Ciebie graczy jest Demon."
+            )
+            player.character.useful_yes_results += 1
+        else:
+            player.jasnowidz_status = (
+                "Nie ma Demona wśród wskazanych przez Ciebie graczy."
+            )
+            player.character.confirmed_no_results += 1
     else:
         player.jasnowidz_status = "Żadna informacja nie jest dostępna dla jasnowidza."
 
@@ -251,3 +264,14 @@ class JasnowidzCharacter(Character):
                 "czy którykolwiek z dwóch graczy jest Demonem."
             ),
         )
+        self.useful_yes_results = 0
+        self.confirmed_no_results = 0
+
+    def evaluate_knowledge_score(self):
+        score = 0
+        # liczba trafień zawężających demona
+        score += self.useful_yes_results * 2
+        # liczba potwierdzonych NO
+        score += self.confirmed_no_results * 1
+
+        return score

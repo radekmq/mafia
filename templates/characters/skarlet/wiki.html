@@ -1,0 +1,40 @@
+{% extends "base.html" %}
+
+{% block title %}Skarlet{% endblock %}
+
+{% block content %}
+
+<div style="overflow-x:auto;" class="container">
+  <h3>Truciciel</h3>
+
+  <button type="button" onclick="window.location.href='{{ back_url }}'">Wróć do listy postaci</button>
+  <button type="button" onclick="window.location.href='/lobby'">Wróć do gry</button>
+
+  <table>
+    <tr><td style="text-align: center;">
+      <img style="width: 40%; height: auto;" src="{{ url_for('static', filename='images/skarlet.png') }}">
+    </td></tr>
+    <tr>
+      <td>
+        Jeśli przy życiu jest 5 lub więcej graczy i Demon umrze, stajesz się Demonem. (Podróżnicy się nie liczą.)
+        Skarlet staje się Demonem, gdy Demon umiera.
+
+        <ul>
+          <li>Jeśli tuż przed śmiercią Demona przy życiu jest pięciu lub więcej graczy — czyli po śmierci Demona pozostają co najmniej cztery żywe osoby — wtedy Skarlet natychmiast staje się Demonem, a gra toczy się dalej, jak gdyby nic się nie stało.</li>
+          <li>Jeśli w chwili egzekucji Demona przy życiu jest mniej niż pięciu graczy, gra kończy się zwycięstwem dobrych.</li>
+          <li>Jeśli przy życiu jest pięciu lub więcej graczy, a Imp zabije samego siebie w nocy, Szkarłatna Kobieta musi stać się nowym Impem.</li>
+          <li>Jeśli Szkarłatna Kobieta staje się Demonem, jest tym Demonem pod każdym względem. Dobrzy wygrywają, jeśli zostanie stracona. Atakuje każdej nocy. Jest wykrywana jako Demon.</li>
+        </ul>
+      </td>
+    </tr>
+  </table>
+
+  <blockquote>Przy życiu jest siedmiu graczy: Imp, Skarlet, dwóch Mieszczan oraz trzech Podróżników. Imp zostaje stracony, więc gra się kończy i dobrzy wygrywają, ponieważ Podróżnicy nie są liczeni do warunku zdolności Skarlet.</blockquote>
+
+  <blockquote>Przy życiu jest pięciu graczy: Imp, Szkarłatna Kobieta, Baron i dwóch Mieszczan. Imp zostaje stracony. Skarlet staje się Impem, a gra trwa dalej.</blockquote>
+
+  <blockquote>Anna jest Skarlet. Wróżbitka wybiera Annę i Alexa i otrzymuje odpowiedź „nie”. Później Imp umiera, więc Anna staje się Impem. Wróżbitka ponownie wybiera Annę i Alexa i otrzymuje odpowiedź „tak”.</blockquote>
+
+</div>
+
+{% endblock %}

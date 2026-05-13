@@ -7,19 +7,75 @@ from player import PlayerStatus
 # = = = = = = = = = = = = =  UTILITIES = = = = = = = = = = = = =
 
 
-def count_evil_alive_neighbors(player, game_state):
+def is_recluse_player(player):
+    """Check whether a player is the Recluse/Pustelnik."""
+    return player is not None and player.character.name == "Pustelnik"
+
+
+def get_recluse_registration_for_empata(player):
+    """Return how the Recluse registers for Empata."""
+    recluse_heuristic = getattr(player.character, "heuristic", None)
+    if recluse_heuristic is None:
+        return None
+
+    return recluse_heuristic.empata_asks_for_neighbors(player)
+
+
+def get_character_names_by_type(game_setup, character_type):
+    """Get all character names for a role type from the scenario setup."""
+    characters_by_type = game_setup.get_dict_of_characters()
+    return {character.name for character in characters_by_type.get(character_type, [])}
+
+
+def is_registered_as_minion(registered_role, game_setup):
+    """Check whether the Recluse registered as a minion."""
+    return registered_role in get_character_names_by_type(game_setup, "minion")
+
+
+def is_registered_as_demon(registered_role, game_setup):
+    """Check whether the Recluse registered as a demon."""
+    return registered_role in get_character_names_by_type(game_setup, "demon")
+
+
+def count_evil_alive_neighbors(player, game_state, game_setup):
     """Count evil characters among Empata's closest alive neighbors."""
     alive_neighbors = get_alive_neighbors(player, game_state)
 
     evil_roles = {RoleType.MINION, RoleType.DEMON}
     evil_neighbors_count = 0
+    recluse_registered_as_minion = False
+    actual_minion_neighbor_found = False
+
     for neighbor in alive_neighbors:
-        if (
-            neighbor
-            and neighbor.character
-            and neighbor.character.role_type in evil_roles
-        ):
+        if not neighbor or not neighbor.character:
+            continue
+
+        if neighbor.character.role_type in evil_roles:
             evil_neighbors_count += 1
+            if neighbor.character.role_type == RoleType.MINION:
+                actual_minion_neighbor_found = True
+            continue
+
+        if not is_recluse_player(neighbor):
+            continue
+
+        registered_role = get_recluse_registration_for_empata(neighbor)
+        if is_registered_as_minion(registered_role, game_setup):
+            recluse_registered_as_minion = True
+            evil_neighbors_count += 1
+            continue
+
+        if is_registered_as_demon(registered_role, game_setup):
+            evil_neighbors_count += 1
+
+    alive_neighbors_count = len([neighbor for neighbor in alive_neighbors if neighbor])
+    if (
+        alive_neighbors_count == 2
+        and recluse_registered_as_minion
+        and actual_minion_neighbor_found
+        and evil_neighbors_count > 1
+    ):
+        return 1
 
     return evil_neighbors_count
 
@@ -158,7 +214,7 @@ def ability_night_resolution_original(data):
         data["game_setup"],
     )
 
-    evil_neighbors_count = count_evil_alive_neighbors(player, game_state)
+    evil_neighbors_count = count_evil_alive_neighbors(player, game_state, _game_setup)
     if evil_neighbors_count == 2:
         player.character.detected_double_evil_zone = 1
     if evil_neighbors_count == 1:
@@ -176,7 +232,7 @@ def ability_night_resolution_fake(data):
         data["game_setup"],
     )
 
-    evil_neighbors_count = count_evil_alive_neighbors(player, game_state)
+    evil_neighbors_count = count_evil_alive_neighbors(player, game_state, _game_setup)
     false_counts = [count for count in range(3) if count != evil_neighbors_count]
 
     cache_key = get_alive_neighbors_cache_key(player, game_state)
@@ -240,11 +296,12 @@ class EmpataCharacter(Character):
         self.consistent_readings = 0.5
         self.detected_double_evil_zone = 0
 
-    def evaluate_knowledge_score(self):
-        score = 0
-        score += self.consistent_readings * 2
+    def evaluate_knowledge_score(self, _) -> float:
+        """Evaluate knowledge score based on the information they have."""
+        score = 0.0
+        score += self.consistent_readings * 2.0
 
         if self.detected_double_evil_zone:
-            score += 5
+            score += 5.0
 
         return score

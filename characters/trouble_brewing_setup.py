@@ -5,14 +5,20 @@ from characters.character import RoleType
 from characters.character_details.bibliotekarka import BibliotekarkaCharacter
 from characters.character_details.detektyw import DetektywCharacter
 from characters.character_details.empata import EmpataCharacter
+from characters.character_details.grabarz import GrabarzCharacter
 from characters.character_details.imp import ImpCharacter
 from characters.character_details.jasnowidz import JasnowidzCharacter
+from characters.character_details.krukarz import KrukarzCharacter
 from characters.character_details.kucharz import KucharzCharacter
 from characters.character_details.lokaj import LokajCharacter
+from characters.character_details.mnich import MnichCharacter
 from characters.character_details.pijak import PijakCharacter
 from characters.character_details.praczka import PraczkaCharacter
+from characters.character_details.pustelnik import PustelnikCharacter
+from characters.character_details.skarlet import SkarletCharacter
 from characters.character_details.swiety import SwietyCharacter
 from characters.character_details.truciciel import TrucicielCharacter
+from characters.character_details.zolnierz import ZolnierzCharacter
 from characters.scenario import Scenario
 from logger import log_info
 from player import PlayerStatus
@@ -31,14 +37,20 @@ class TroubleBrewingScenario(Scenario):
         self.add_character(KucharzCharacter())
         self.add_character(EmpataCharacter())
         self.add_character(JasnowidzCharacter())
+        self.add_character(GrabarzCharacter())
+        self.add_character(ZolnierzCharacter())
+        self.add_character(MnichCharacter())
+        self.add_character(KrukarzCharacter())
 
         # ====== OUTSIDER ======
         self.add_character(PijakCharacter())
         self.add_character(SwietyCharacter())
         self.add_character(LokajCharacter())
+        self.add_character(PustelnikCharacter())
 
         # ====== MINIONKI ======
         self.add_character(TrucicielCharacter())
+        self.add_character(SkarletCharacter())
 
         # ====== DEMONY ======
         self.add_character(ImpCharacter())
@@ -155,6 +167,7 @@ class TroubleBrewingScenario(Scenario):
 
         self.effect_priorities = {
             "player_setup": {
+                # default: 80
                 "Baron": 10,
             },
             "night_actions": {},
@@ -163,6 +176,33 @@ class TroubleBrewingScenario(Scenario):
                 "Truciciel": 10,
                 "Imp": 90,
             },
+        }
+
+        self.character_power = {
+            # Townsfolk
+            "Praczka": 2,
+            "Bibliotekarka": 2,
+            "Detektyw": 2,
+            "Kucharz": 3,
+            "Empata": 4,
+            "Jasnowidz": 5,
+            "Grabarz": 5,
+            "Mnich": 3,
+            "Krukarz": 3,
+            "Dziewica": 4,
+            "Zabojca": 3,
+            "Żołnierz": 2,
+            "Burmistrz": 4,
+            # Outsiders
+            "Lokaj": -1,
+            "Pijak": -4,
+            "Święty": -5,
+            # Minions
+            "Truciciel": -5,
+            "Skarlet": -4,
+            "Baron": -4,
+            # Demon
+            "Imp": -6,
         }
 
     def game_over_conditions(self, game_state) -> bool:
@@ -208,31 +248,3 @@ class TroubleBrewingScenario(Scenario):
             log_info("Game over conditions not fullfilled!")
 
         return []
-
-
-CHARACTER_POWER = {
-    # Townsfolk
-    "Praczka": 2,
-    "Bibliotekarka": 2,
-    "Detektyw": 2,
-    "Kucharz": 3,
-    "Empata": 4,
-    "Jasnowidz": 5,
-    "Grabarz": 5,
-    "Mnich": 3,
-    "Krukarz": 3,
-    "Dziewica": 4,
-    "Zabojca": 3,
-    "Żołnierz": 2,
-    "Burmistrz": 4,
-    # Outsiders
-    "Lokaj": -1,
-    "Pijak": -4,
-    "Święty": -5,
-    # Minions
-    "Truciciel": -5,
-    "Skarlet": -4,
-    "Baron": -4,
-    # Demon
-    "Imp": -6,
-}

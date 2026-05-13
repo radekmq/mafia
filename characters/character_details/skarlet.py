@@ -5,8 +5,8 @@ from logger import log_info
 
 
 def render_introduction(game_engine, current_player):
-    """Render effect of the Swiety's ability during the introduction phase."""
-    log_info("Get data for Swiety introduction.")
+    """Render effect of the Skarlet's ability during the introduction phase."""
+    log_info("Get data for Skarlet introduction.")
     player_character = current_player.character
 
     return {
@@ -21,8 +21,8 @@ def render_introduction(game_engine, current_player):
 
 
 def render_night_action(game_engine, current_player):
-    """Effect of the Swiety's ability during night_all_players_action state."""
-    log_info("Get data for Swiety night action.")
+    """Effect of the Skarlet's ability during night_all_players_action state."""
+    log_info("Get data for Skarlet night action.")
 
     screen_content = "confirm_night_action"
     player_status = "Potwierdź swoją nocną akcję."
@@ -46,8 +46,8 @@ def render_night_action(game_engine, current_player):
 
 
 def render_night_resolution(game_engine, current_player):
-    """Effect of the Swiety's ability during night_all_players_action state."""
-    log_info("Get data for Swiety night resolution.")
+    """Effect of the Skarlet's ability during night_all_players_action state."""
+    log_info("Get data for Skarlet night resolution.")
     player_character = current_player.character
 
     return {
@@ -57,14 +57,14 @@ def render_night_resolution(game_engine, current_player):
             "player_link": player_character.route,
             "player_image": player_character.image_path,
             "player_info": player_character.description,
-            "player_status": "Święty nie wykonuje specjalnej akcji w nocy.",
+            "player_status": "Skarlet nie wykonuje specjalnej akcji w nocy.",
             "screen_content": "action_completed",
         },
     }
 
     # = = = = = = = = = = = = =  ABILITY EFFECTS = = = = = = = = = = = = =
 
-    """Configure for the Swiety's ability."""
+    """Configure for the Skarlet's ability."""
 
 
 ability = Ability()
@@ -85,43 +85,72 @@ render_page = RenderPage(
 )
 
 
-class SwietyCharacter(Character):
-    """Class representing the Swiety character."""
+class SkarletCharacter(Character):
+    """Class representing the Skarlet character."""
 
     def __init__(self):
-        """Initialize the Swiety character."""
+        """Initialize the Skarlet character."""
 
         super().__init__(
-            name="Swiety",
-            role_type=RoleType.OUTSIDER,
+            name="Skarlet",
+            role_type=RoleType.MINION,
             ability=ability,
             render_page=render_page,
-            image_path="swiety.png",
-            route="swiety",
+            image_path="skarlet.png",
+            route="skarlet",
         )
 
         self.description = (
-            "Jeśli zostaniesz stracony w wyniku egzekucji, twoja drużyna przegrywa. "
-            "Święty (Saint) kończy grę porażką swojej drużyny, jeśli zostanie stracony."
+            (
+                "Jeśli przy życiu pozostaje 5 lub więcej graczy, a Demon umrze, stajesz się Demonem. "
+                "Skarlet staje się Demonem, gdy Demon umrze."
+            ),
         )
 
     def game_over_conditions(self, game_state) -> bool:
-        """Check game over conditions for the Swiety character."""
-        log_info("Checking game over conditions for Swiety.")
+        """Check game over conditions for the Skarlet character."""
+        log_info("Checking game over conditions for Skarlet.")
 
-        swiety_player = next(
+        skarlet_player = next(
             (player for player in game_state.players if player.character == self), None
         )
 
-        if swiety_player is None:
-            log_info("Swiety is not in the game, skipping game over check.")
-
-        elif swiety_player.is_player_executed():
-            log_info("Swiety has been executed. Game over condition met.")
-            game_state.winning_team = "Źli (Minionki + Demon)"
-            game_state.set_game_over_conditions_met(True)
-
+        if skarlet_player is None:
+            log_info("Skarlet is not in the game, skipping game over check.")
         else:
-            log_info("Swiety has not been executed. Game over condition not met.")
+            is_any_demon_alive = any(
+                player.is_alive()
+                and player.character is not None
+                and player.character.role_type == RoleType.DEMON
+                for player in game_state.players
+            )
+
+            if is_any_demon_alive:
+                log_info("A living Demon is still in play. Skarlet stays unchanged.")
+                return []
+
+            demon_player = next(
+                (
+                    player
+                    for player in game_state.players
+                    if player.character is not None
+                    and player.character.role_type == RoleType.DEMON
+                    and player.client_id != skarlet_player.client_id
+                ),
+                None,
+            )
+
+            if demon_player is None:
+                log_info("No Demon player found to copy additional characters from.")
+                return []
+
+            skarlet_player.character.role_type = RoleType.DEMON
+            skarlet_player.additional_characters = list(
+                demon_player.additional_characters or []
+            )
+
+            log_info(
+                "Skarlet becomes the Demon and receives the Demon additional characters list."
+            )
 
         return []

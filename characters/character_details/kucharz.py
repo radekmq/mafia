@@ -88,6 +88,30 @@ def render_night_resolution(game_engine, current_player):
 # = = = = = = = = = = = = =  ABILITY EFFECTS = = = = = = = = = = = = =
 
 
+def get_minion_names(game_setup):
+    """Get minion names from the scenario setup."""
+    return {
+        character.name
+        for character in game_setup.get_dict_of_characters().get("minion", [])
+    }
+
+
+def is_evil_for_kucharz(player, game_setup):
+    """Check whether a player should count as evil for Kucharz."""
+    if player.character.role_type in {RoleType.MINION, RoleType.DEMON}:
+        return True
+
+    if player.character.name != "Pustelnik":
+        return False
+
+    recluse_heuristic = getattr(player.character, "heuristic", None)
+    if recluse_heuristic is None:
+        return False
+
+    registered_role = recluse_heuristic.kucharz_asks_for_evil_pairs(player)
+    return registered_role in get_minion_names(game_setup)
+
+
 def ability_setup_fake(data):
     """Fake setup for the Kucharz's ability, used for testing."""
     log_info("Kucharz is drunk, false information will be provided.")
@@ -98,6 +122,7 @@ def ability_setup_fake(data):
     )
 
     evil_pairs = ability_setup_original(data)
+    player.character.used_fake_setup = True
     setup_for_player_count = next(
         (
             row
@@ -138,6 +163,7 @@ def ability_setup_original(data):
         data["game_setup"],
     )
 
+    player.character.used_fake_setup = False
     players_in_seat_order = sorted(
         [candidate for candidate in game_state.players if candidate.character],
         key=lambda candidate: candidate.seat_no,
@@ -146,17 +172,16 @@ def ability_setup_original(data):
     if len(players_in_seat_order) < 2:
         evil_pairs = 0
     else:
-        evil_roles = {RoleType.MINION, RoleType.DEMON}
         evil_pairs = 0
         players_count = len(players_in_seat_order)
 
         for index, current_player in enumerate(players_in_seat_order):
             next_player = players_in_seat_order[(index + 1) % players_count]
-            if (
-                current_player.character.role_type in evil_roles
-                and next_player.character.role_type in evil_roles
+            if is_evil_for_kucharz(current_player, game_setup) and is_evil_for_kucharz(
+                next_player, game_setup
             ):
                 evil_pairs += 1
+    player.character.eveil_pairs = evil_pairs
     player.player_status = (
         f"Kucharz wie, że liczba par złych graczy siedzących obok siebie to: {evil_pairs}\n\n"
         f"Twoja wiedza nie może zostać zniekształcona przez otrucie."
@@ -206,8 +231,15 @@ class KucharzCharacter(Character):
             "Na początku wiesz, ile par złych graczy siedzi obok siebie. "
             "Kucharz wie, czy źli gracze siedzą obok siebie."
         )
+        self.eveil_pairs = 0
+        self.used_fake_setup = False
 
-    def evaluate_knowledge_score(self):
+    def evaluate_knowledge_score(self) -> float:
         """Evaluate knowledge score based on the information they have."""
-        score = 2.0
-        return score
+        if self.used_fake_setup:
+            return -1.0
+        if self.eveil_pairs == 1:
+            return 2.0
+        elif self.eveil_pairs > 1:
+            return 3.0
+        return 1.0

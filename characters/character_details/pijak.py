@@ -129,3 +129,7 @@ class PijakCharacter(Character):
             "Praczka dowiaduje się, że dana postać Mieszczanina jest w grze, "
             "ale nie wie, który gracz ją posiada."
         )
+
+    def evaluate_knowledge_score(self, player) -> float:
+        """Evaluate knowledge score based on the information they have."""
+        return player.additional_characters[0].evaluate_knowledge_score(player)

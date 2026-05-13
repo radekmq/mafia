@@ -4,6 +4,9 @@ from characters.character import Ability, Character, DualEffect, RenderPage, Rol
 from logger import log_info
 from player import PlayerStatus
 
+# = = = = = = = = = = = = =  UTILITIES = = = = = = = = = = = = = =
+
+
 # = = = = = = = = = = = = =  RENDER PAGE = = = = = = = = = = = = =
 
 
@@ -96,6 +99,7 @@ def ability_setup_fake(data):
         data["game_state"],
         data["game_setup"],
     )
+    player.character.used_fake_setup = True
     players = game_state.players
     character_pool = game_setup.get_list_of_characters_by_type(RoleType.OUTSIDER)
     character_pool = [char.character for char in character_pool]
@@ -161,6 +165,7 @@ def ability_setup_original(data):
     """Configure for the Bibliotekarka's ability."""
     log_info("# # # # Setting up Bibliotekarka's ability. # # # #")
     player, game_state = (data["target"], data["game_state"])
+    player.character.used_fake_setup = False
     players = game_state.players
     if player is None:
         return
@@ -248,8 +253,10 @@ class BibliotekarkaCharacter(Character):
             "(lub że żaden nie jest w grze). Bibliotekarka dowiaduje się, "
             "że konkretny Outsider jest w grze, ale nie kto go gra."
         )
+        self.used_fake_setup = False
 
-    def evaluate_knowledge_score(self):
+    def evaluate_knowledge_score(self, _) -> float:
         """Evaluate knowledge score based on the information they have."""
-        score = 2.0
-        return score
+        if self.used_fake_setup:
+            return -1.0
+        return 2.0

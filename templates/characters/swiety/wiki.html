@@ -1,0 +1,37 @@
+{% extends "base.html" %}
+
+{% block title %}Żołnierz{% endblock %}
+
+{% block content %}
+
+<div style="overflow-x:auto;" class="container">
+  <h3>Truciciel</h3>
+
+  <button type="button" onclick="window.location.href='{{ back_url }}'">Wróć do listy postaci</button>
+  <button type="button" onclick="window.location.href='/lobby'">Wróć do gry</button>
+
+  <table>
+    <tr><td style="text-align: center;">
+      <img style="width: 40%; height: auto;" src="{{ url_for('static', filename='images/zolnierz.png') }}">
+    </td></tr>
+    <tr>
+      <td>
+        Jesteś bezpieczny przed Demonem. Żołnierz nie może zostać zabity przez Demona.
+
+        <ul>
+          <li>Żołnierz nie może umrzeć od zdolności Demona. Jeśli więc Imp zaatakuje Żołnierza w nocy, nic się nie dzieje. Nikt nie umiera. Imp nie może wybrać innego gracza do zaatakowania zamiast niego.</li>
+          <li>Żołnierz nadal może zginąć w wyniku egzekucji, nawet jeśli nominującym był Demon. Żołnierz jest chroniony przed zdolnością zabijania Demona, a nie przed działaniami gracza będącego Demonem.</li>
+        </ul>
+      </td>
+    </tr>
+  </table>
+
+  <blockquote>Imp atakuje Żołnierza. Żołnierz nie umiera, więc tej nocy nikt nie ginie.</blockquote>
+
+  <blockquote>Imp atakuje Żołnierza. Żołnierz umiera, ponieważ tak naprawdę jest Pijakiem.</blockquote>
+
+  <blockquote>Truciciel zatruwa Żołnierza, a następnie Imp atakuje Żołnierza. Żołnierz umiera, ponieważ nie ma wtedy swojej zdolności.</blockquote>
+
+</div>
+
+{% endblock %}

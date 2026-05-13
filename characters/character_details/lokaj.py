@@ -192,3 +192,12 @@ class LokajCharacter(Character):
                 f"Lokaj {player.name} cannot vote YES because their master is not alive or has not voted YES."
             )
             return False
+
+    def evaluate_knowledge_score(self, player) -> float:
+        """Evaluate knowledge score based on the information they have."""
+        if player.butlers_master is not None and player.butlers_master.role_type in {
+            RoleType.TOWNSFOLK,
+            RoleType.OUTSIDER,
+        }:
+            return 1.0
+        return -1.0

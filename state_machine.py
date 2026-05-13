@@ -135,53 +135,19 @@ class StateMachine:
         )
         self.dispatcher.enqueue_event(event)
 
+    def on_enter_calculate_game_score(self):
+        """Handle on enter calculate game score."""
+        log_info("[SM on enter] Obliczanie wyniku gry")
+
+        event = Event(
+            name="enter_game_score_calculation",
+            actor_id="SYSTEM",
+        )
+        self.dispatcher.enqueue_event(event)
+
     # =========================
     # HOOKI (EXIT)
     # =========================
-
-    def on_exit_lobby(self):
-        """Handle on exit lobby."""
-        log_info("[SM on exit] Start gry")
-
-    def on_exit_players_introduction(self):
-        """Handle on exit players introduction."""
-        log_info("[SM on exit] Zakończono przedstawienie")
-
-    def on_exit_night_actions(self):
-        """Handle on exit night minion action."""
-        log_info("[SM on exit] NOC: Akcje graczy zakończone")
-
-    def on_exit_night_resolving_actions(self):
-        """Handle on exit night all players action."""
-        log_info("[SM on exit] NOC: Rozpatrzenie akcji zakończone")
-
-    def on_exit_night_summary(self):
-        """Handle on exit night presentations."""
-        log_info("[SM on exit] Zakończono prezentacje nocne")
-
-    def on_exit_day_discussions(self):
-        """Handle on exit day discussions."""
-        log_info("[SM on exit] Koniec dyskusji")
-
-    def on_exit_nomination(self):
-        """Handle on exit nomination."""
-        log_info("[SM on exit] Koniec nominacji")
-
-    def on_exit_voting(self):
-        """Handle on exit voting."""
-        log_info("[SM on exit] Koniec głosowania")
-
-    def on_exit_execution(self):
-        """Handle on exit execution."""
-        log_info("[SM on exit] Zakończono egzekucję")
-
-    def on_exit_night_game_conditions(self):
-        """Handle on exit night game conditions."""
-        log_info("[SM on exit] Noc: Zakończono sprawdzanie warunków zakończenia gry")
-
-    def on_exit_day_game_conditions(self):
-        """Handle on exit day game conditions."""
-        log_info("[SM on exit] Dzień: Zakończono sprawdzanie warunków zakończenia gry")
 
     def on_exit_game_over(self):
         """Handle on exit game over."""
@@ -222,6 +188,7 @@ states = [
     "execution",
     "day_game_conditions",
     "game_over",
+    "calculate_game_score",
 ]
 
 transitions = [
@@ -234,6 +201,11 @@ transitions = [
     {
         "trigger": "next_phase",
         "source": "players_introduction",
+        "dest": "calculate_game_score",
+    },
+    {
+        "trigger": "game_score_calculated",
+        "source": "calculate_game_score",
         "dest": "night_actions",
     },
     # NOC
@@ -256,6 +228,11 @@ transitions = [
     {
         "trigger": "all_conditions_resolved",
         "source": "night_game_conditions",
+        "dest": "calculate_game_score",
+    },
+    {
+        "trigger": "game_score_calculated",
+        "source": "calculate_game_score",
         "dest": "day_discussions",
     },
     # DZIEŃ

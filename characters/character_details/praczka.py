@@ -96,6 +96,7 @@ def ability_setup_fake(data):
         data["game_state"],
         data["game_setup"],
     )
+    player.character.used_fake_setup = True
     players = game_state.players
     character_pool = game_setup.get_list_of_characters_by_type(RoleType.TOWNSFOLK)
     character_pool = [char.character for char in character_pool]
@@ -166,6 +167,7 @@ def ability_setup_original(data):
         data["game_state"],
         data["game_setup"],
     )
+    player.character.used_fake_setup = False
     players = game_state.players
     if player is None:
         return
@@ -254,8 +256,10 @@ class PraczkaCharacter(Character):
             "Praczka dowiaduje się, że dana postać Mieszczanina jest w grze, "
             "ale nie wie, który gracz ją posiada."
         )
+        self.used_fake_setup = False
 
-    def evaluate_knowledge_score(self):
+    def evaluate_knowledge_score(self, _) -> float:
         """Evaluate knowledge score based on the information they have."""
-        score = 2.0
-        return score
+        if self.used_fake_setup:
+            return -1.0
+        return 2.0

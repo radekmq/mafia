@@ -1,38 +1,37 @@
 {% extends "base.html" %}
 
-{% block title %}Mnich{% endblock %}
+{% block title %}Święty{% endblock %}
 
 {% block content %}
 
 <div style="overflow-x:auto;" class="container">
-  <h3>Mnich</h3>
+  <h3>Święty</h3>
 
   <button type="button" onclick="window.location.href='{{ back_url }}'">Wróć do listy postaci</button>
   <button type="button" onclick="window.location.href='/lobby'">Wróć do gry</button>
 
   <table>
     <tr><td style="text-align: center;">
-      <img style="width: 40%; height: auto;" src="{{ url_for('static', filename='images/mnich.png') }}">
+      <img style="width: 40%; height: auto;" src="{{ url_for('static', filename='images/swiety.png') }}">
     </td></tr>
     <tr>
       <td>
-        Każdej nocy wybierz gracza (nie siebie): tej nocy jest on bezpieczny przed Demonem.
-        Mnich (Monk) chroni innych graczy przed Demonem.
+        Jeśli umrzesz w wyniku egzekucji, twoja drużyna przegrywa.
+        Święty kończy grę, jeśli zostanie stracony.
 
         <ul>
-          <li>Każdej nocy, z wyjątkiem pierwszej, Mnich może wybrać dowolnego gracza (oprócz siebie), którego chce chronić.</li>
-          <li>Jeśli Demon zaatakuje gracza chronionego przez Mnicha, ten gracz nie ginie. Demon nie wykonuje wtedy dodatkowego ataku — po prostu tej nocy nie ma żadnej śmierci.</li>
-          <li>Mnich nie chroni przed egzekucją spowodowaną nominacją przez Demona.</li>
+          <li>Jeśli Święty umrze w wyniku egzekucji, gra natychmiast się kończy. Dobrzy przegrywają, a źli wygrywają.</li>
+          <li>Jeśli Święty umrze w jakikolwiek inny sposób niż egzekucja — na przykład zostanie zabity przez Demona — gra toczy się dalej.</li>
         </ul>
       </td>
     </tr>
   </table>
 
-  <blockquote>Mnich chroni Wróżbitkę (Fortune Teller). Imp atakuje Wróżbitkę. Tej nocy nikt nie ginie.</blockquote>
+  <blockquote>Przy życiu jest siedmiu graczy i trwa faza nominacji. Święty otrzymuje cztery głosy i ma zostać stracony. Następnie nominowany zostaje Baron, ale otrzymuje tylko trzy głosy. Tego dnia nie dochodzi już do kolejnych nominacji. Święty zostaje stracony, a źli wygrywają.</blockquote>
 
-  <blockquote>Mnich chroni Burmistrza (Mayor), a Imp atakuje Burmistrza. Zdolność Burmistrza („zamiast ciebie może zginąć inny gracz”) nie aktywuje się, ponieważ Burmistrz jest bezpieczny przed Demonem. Tej nocy nikt nie ginie.</blockquote>
+  <blockquote>Imp zostaje nominowany i gracze głosują. Rewolwerowiec zabija Świętego. Święty umiera, ale gra toczy się dalej.</blockquote>
 
-  <blockquote>Mnich chroni Impa. Imp próbuje tej nocy zabić samego siebie, ale nic się nie dzieje. Imp pozostaje przy życiu i nie powstaje nowy Imp.</blockquote>
+  <blockquote>Święty zostaje skazany na egzekucję. Jednak aktywuje się zdolność Kozła Ofiarnego, więc zamiast niego umiera Kozioł Ofiarny. Gra toczy się dalej, ponieważ Święty faktycznie nie umarł.</blockquote>
 
 </div>
 

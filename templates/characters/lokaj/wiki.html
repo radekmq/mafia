@@ -1,0 +1,39 @@
+{% extends "base.html" %}
+
+{% block title %}Lokaj{% endblock %}
+
+{% block content %}
+
+<div style="overflow-x:auto;" class="container">
+  <h3>Truciciel</h3>
+
+  <button type="button" onclick="window.location.href='{{ back_url }}'">Wróć do listy postaci</button>
+  <button type="button" onclick="window.location.href='/lobby'">Wróć do gry</button>
+
+  <table>
+    <tr><td style="text-align: center;">
+      <img style="width: 40%; height: auto;" src="{{ url_for('static', filename='images/lokaj.png') }}">
+    </td></tr>
+    <tr>
+      <td>
+        Każdej nocy wybierz gracza (nie siebie): jutro możesz głosować tylko wtedy, gdy on również głosuje.
+        Lokaj może głosować tylko wtedy, gdy głosuje jego Pan (wybrany gracz).
+
+        <ul>
+          <li>Każdej nocy Lokaj wybiera gracza, który będzie jego Panem. Może wybrać tę samą osobę co poprzedniej nocy albo inną.</li>
+          <li>Jeśli Pan trzyma rękę w górze, aby zagłosować, albo jego głos został już policzony, Lokaj może również podnieść rękę do głosowania.</li>
+          <li>Jeśli Pan trzyma rękę opuszczoną, sygnalizując, że nie głosuje, albo opuści rękę zanim jego głos zostanie policzony, Lokaj także musi opuścić rękę.</li>
+        </ul>
+      </td>
+    </tr>
+  </table>
+
+  <blockquote>Lokaj wybiera Filipa na swojego Pana. Następnego dnia, jeśli Filip podniesie rękę podczas głosowania nad egzekucją, Lokaj również może zagłosować. Jeśli nie, Lokaj nie może podnieść ręki.</blockquote>
+
+  <blockquote>Trwa nominacja. Lokaj i jego Pan mają podniesione ręce do głosowania. Gdy Mistrz Gry liczy głosy, Pan w ostatniej chwili opuszcza rękę. Lokaj musi natychmiast opuścić swoją rękę.</blockquote>
+
+  <blockquote>Lokaj nie żyje. Ponieważ martwi gracze nie mają zdolności, Lokaj może użyć swojego żetonu głosu w dowolnym momencie.</blockquote>
+
+</div>
+
+{% endblock %}

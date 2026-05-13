@@ -1,7 +1,4 @@
-import random
-
 from characters.character import RoleType
-from characters.trouble_brewing_setup import CHARACTER_POWER
 from logger import log_info
 from player import PlayerStatus
 
@@ -9,8 +6,9 @@ KNOWLEDGE_VALUE = {"zero": 0, "weak": 1, "medium": 2, "strong": 4, "confirmed": 
 
 
 class WinnerHeuristic:
-    def __init__(self, game_state):
+    def __init__(self, game_state, character_power):
         self.game_state = game_state
+        self.character_power = character_power
         log_info("WinnerHeuristic initialized with game state.")
 
     def evaluate_player_count(self) -> float:
@@ -78,7 +76,7 @@ class WinnerHeuristic:
         for player in self.game_state.players:
             character = player.character.name
 
-            power = CHARACTER_POWER.get(character, 0)
+            power = self.character_power.get(character, 0)
             log_info(
                 f"[WinnerHeuristic] Evaluating character {character} with base power {power}."
             )
@@ -107,8 +105,8 @@ class WinnerHeuristic:
                 continue
 
             if hasattr(player.character, "evaluate_knowledge_score"):
-                knowledge = player.character.evaluate_knowledge_score()
-                power = CHARACTER_POWER.get(player.character.name, 1)
+                knowledge = player.character.evaluate_knowledge_score(player)
+                power = self.character_power.get(player.character.name, 1)
                 log_info(
                     f"[WinnerHeuristic] Evaluating good knowledge for {player.character.name}: {knowledge} (power: {power})"
                 )
@@ -132,7 +130,7 @@ class WinnerHeuristic:
                 continue
 
             penalty = 0.0
-            power = CHARACTER_POWER.get(player.character.name, 0)
+            power = self.character_power.get(player.character.name, 0)
             log_info(
                 f"[WinnerHeuristic] Evaluating misinformation for {player.character.name} with base power {power}."
             )
@@ -159,46 +157,50 @@ class WinnerHeuristic:
 
     def evaluate_voting_history(self) -> float:
         score = 0.0
-        nominated_players = self.game_state.get_nominated_players()
+        voting_snapshot = self.game_state.get_last_day_voting_snapshot()
         log_info(
-            f"[WinnerHeuristic] Evaluating voting history for nominated players: {[p.character.name for p in nominated_players]}"
+            "[WinnerHeuristic] Evaluating voting history for last day nominated players: "
+            f"{[p.get('character_name') for p in voting_snapshot]}"
         )
 
-        for nominee in nominated_players:
-            # 1. Sama presja głosów
-            if nominee.character.role_type in [RoleType.DEMON, RoleType.MINION]:
-                score += nominee.number_of_votes * 2.0
+        for nominee in voting_snapshot:
+            nominee_votes = nominee.get("votes", 0)
+            nominee_role_type = nominee.get("role_type")
 
-                if nominee.character.role_type in [RoleType.DEMON]:
-                    score += nominee.number_of_votes * 3.0
+            # 1. Sama presja głosów
+            if nominee_role_type in [RoleType.DEMON, RoleType.MINION]:
+                score += nominee_votes * 2.0
+
+                if nominee_role_type in [RoleType.DEMON]:
+                    score += nominee_votes * 3.0
 
             else:
-                score -= nominee.number_of_votes * 1.5
+                score -= nominee_votes * 1.5
 
-            # 2. Faktyczna egzekucja
-            last_executed_player = self.game_state.last_executed_player
-            if last_executed_player:
-                if last_executed_player.character.role_type in [
-                    RoleType.DEMON,
-                    RoleType.MINION,
-                ]:
-                    score += 6.0
-                    if last_executed_player.character.role_type in [RoleType.DEMON]:
-                        score += 20.0
-                    else:
-                        score += 3.0
-
+        # 2. Faktyczna egzekucja (niezależnie od tego, czy są aktywne nominacje)
+        last_executed_player = self.game_state.last_executed_player
+        if last_executed_player:
+            if last_executed_player.character.role_type in [
+                RoleType.DEMON,
+                RoleType.MINION,
+            ]:
+                score += 6.0
+                if last_executed_player.character.role_type in [RoleType.DEMON]:
+                    score += 20.0
                 else:
-                    score -= 5.0
+                    score += 3.0
 
-                    if last_executed_player.character.name in [
-                        "Jasnowidz",
-                        "Grabarz",
-                        "Empata",
-                        "Dziewica",
-                        "Burmistrz",
-                    ]:
-                        score -= 3.0
+            else:
+                score -= 5.0
+
+                if last_executed_player.character.name in [
+                    "Jasnowidz",
+                    "Grabarz",
+                    "Empata",
+                    "Dziewica",
+                    "Burmistrz",
+                ]:
+                    score -= 3.0
 
         log_info(f"[WinnerHeuristic] Voting history score: {score}")
         return score
@@ -283,15 +285,15 @@ class WinnerHeuristic:
             score_player_count
             + score_alive_characters
             + score_good_knowledge
-            + score_misinformation
+            - score_misinformation
             + score_voting_history
             + score_endgame
         )
 
         log_info(f"[WinnerHeuristic] Total advantage score: {score}")
         log_info(
-            "[WinnerHeuristic] Score elements: "
-            + ", ".join(
+            "\n[WinnerHeuristic] Score elements: "
+            + ", \n".join(
                 [
                     f"Player count: {score_player_count}",
                     f"Alive characters: {score_alive_characters}",
@@ -304,111 +306,3 @@ class WinnerHeuristic:
         )
 
         return score
-
-
-class RecluseHeuristic:
-    def __init__(self, game_state):
-        self.game_state = game_state
-        log_info("RecluseHeuristic initialized with game state.")
-        self.winner_heuristic = WinnerHeuristic(game_state)
-        self.score_cache = 0.0
-        self.recluse_context_weight = {
-            "Jasnowidz": 1.0,
-            "Detektyw": 1.2,
-            "Grabarz": 0.8,
-            "Empata": 0.7,
-            "Kucharz": 0.6,
-            "Zabojca": 0.4,
-        }
-        # Dodaj pamięć dla contextów
-        self.recluse_memory = {}
-        # Licznik zapytań o character registration w danym dniu/nocy
-        self.recluse_query_counter = 0
-        self.recluse_last_phase = None
-
-    def evaluate_game_advantage(self):
-        score = self.winner_heuristic.evaluate_game_advantage()
-        self.score_cache = score
-        log_info(
-            f"[RecluseHeuristic] Base advantage score from WinnerHeuristic: {score}"
-        )
-
-    def set_new_phase(self):
-        """Reset licznik zapytań jeśli zmieniła się faza (dzień/noc)."""
-        self.recluse_query_counter = 0
-
-    def get_recluse_fake_chance(self):
-        if self.score_cache >= 25:
-            return 0.90  # dobro mocno prowadzi
-        if self.score_cache >= 12:
-            return 0.75
-        if self.score_cache >= 5:
-            return 0.60
-        if self.score_cache > -5:
-            return 0.45  # gra wyrównana
-        if self.score_cache > -12:
-            return 0.25
-        if self.score_cache > -25:
-            return 0.10
-        return 0.0  # zło bardzo prowadzi
-
-    def should_recluse_fake(self, context: str) -> bool:
-        # Zmniejsz szansę na kłamstwo o 25% za każde kolejne zapytanie w tej samej fazie
-        base_chance = self.get_recluse_fake_chance()
-        context_weight = self.recluse_context_weight.get(context, 1.0)
-        # Każde kolejne zapytanie zmniejsza szansę o 25% (czyli *0.75)
-        chance = base_chance * context_weight * (0.75**self.recluse_query_counter)
-        chance = max(0.0, min(chance, 0.95))
-        self.recluse_query_counter += 1
-        log_info(
-            f"[RecluseHeuristic] Context: {context}, Base fake chance: {base_chance:.2f}, Context weight: {context_weight}, Query count: {self.recluse_query_counter}, Final fake chance: {chance:.2f}"
-        )
-        return random.random() < chance
-
-    def get_recluse_registered_character(self, context: str):
-        # Jeśli już pamiętamy odpowiedź dla tego contextu, zwróć ją
-        if context in self.recluse_memory:
-            return self.recluse_memory[context]
-
-        recluse_fake = self.should_recluse_fake(context)
-
-        if not recluse_fake:
-            self.recluse_memory[context] = "Recluse"
-            return "Recluse"
-
-        evil_options = ["Imp", "Poisoner", "Spy", "Baron", "Scarlet Woman"]
-        chosen = random.choice(evil_options)
-        self.recluse_memory[context] = chosen
-        log_info(
-            f"[RecluseHeuristic] Recluse decides to fake as: {chosen} in context: {context}"
-        )
-        return chosen
-
-    def grabarz_asks_for_character(self, executed_player):
-        if executed_player.character.name == "Recluse":
-            return self.get_recluse_registered_character("Grabarz")
-        return executed_player.character.name
-
-    def jasnowidz_asks_for_character(self, player):
-        if player.character.name == "Recluse":
-            return self.get_recluse_registered_character("Jasnowidz")
-        return player.character.name
-
-    def empata_asks_for_neighbors(self, player):
-        if player.character.name == "Recluse":
-            return self.get_recluse_registered_character("Empata")
-        return (
-            None  # Empata i tak nie dostaje informacji o sąsiadach, więc zwracamy None
-        )
-
-    def kucharz_asks_for_evil_pairs(self, player):
-        if player.character.name == "Recluse":
-            return self.get_recluse_registered_character("Kucharz")
-        return None  # Kucharz i tak nie dostaje informacji o parach złych graczy, więc zwracamy None
-
-    def zabojca_asks_for_demon(self, player):
-        if player.character.name == "Recluse":
-            return self.get_recluse_registered_character("Zabojca")
-        return (
-            None  # Zabojca i tak nie dostaje informacji o demonie, więc zwracamy None
-        )

@@ -98,3 +98,6 @@ class Scenario:
         }
 
         return CHARACTERS_BY_TYPE
+
+    def set_recluse_heuristic(self, heuristic):
+        self.get_character_by_route("pustelnik").set_recluse_heuristic(heuristic)

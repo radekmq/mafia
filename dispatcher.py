@@ -38,13 +38,13 @@ def update_state_view(player, data, priority=99):
 
 
 class Dispatcher:
-    def __init__(self, game_state, state_machine, game_setup, winner_heuristic):
+    def __init__(self, game_state, state_machine, game_setup, recluse_heuristic):
         self.event_queue = PriorityQueue()
         self.game_state = game_state
         self.state_machine = state_machine
         self.state_machine.register_dispatcher(self)
         self.game_setup = game_setup
-        self.winner_heuristic = winner_heuristic
+        self.recluse_heuristic = recluse_heuristic
         self.socketio: SocketIO | None = None
 
     def register_socketio(self, socketio: SocketIO):
@@ -156,7 +156,7 @@ class Dispatcher:
             for player in self.game_state.players:
                 priority = self.game_setup.effect_priorities.get(
                     "player_setup", {}
-                ).get(player.character.name, 90)
+                ).get(player.character.name, 80)
                 event = Event(
                     name="player_setup",
                     actor_id="SYSTEM",
@@ -263,8 +263,6 @@ class Dispatcher:
                 )
             # Log status and broadcast state at the end of night actions scheduling
             new_events.append(get_log_players_status_event())
-            event = Event(name="game_score", actor_id="SYSTEM", priority=101)
-            new_events.append(event)
 
         elif event.name == "player_night_resolution":
             player = event.target[0]
@@ -277,8 +275,14 @@ class Dispatcher:
                 data, is_fake=(player.drunk or player.poisoned)
             )
 
-        elif event.name == "game_score":
-            self.winner_heuristic.evaluate_game_advantage()
+        elif event.name == "enter_game_score_calculation":
+            self.recluse_heuristic.evaluate_game_advantage()
+            new_event = Event(
+                    name="game_score_calculated",
+                    actor_id="SYSTEM",
+                    priority=90,
+                )
+                new_events.append(new_event)
 
         elif event.name == "enter_day_discussions":
             for player in self.game_state.players:
@@ -402,6 +406,7 @@ class Dispatcher:
 
             nominated_players = self.game_state.get_nominated_players_dict()
             log_info(f"Nominated players for execution: {nominated_players}")
+            self.game_state.capture_last_day_voting_snapshot()
             self.game_state.reset_voting_statuses()
             for player in self.game_state.players:
                 new_events.append(
@@ -528,6 +533,34 @@ class Dispatcher:
             screen_content = event.data.get("screen_content")
             if screen_content == "select_player":
                 events = player.character.ability.callback_butler(data)
+            if events:
+                new_events.extend(events)
+
+        elif event.name == "mnich_night_choice":
+            player = self.game_state.get_player_by_client_id(event.actor_id)
+            data = {
+                "actor": player,
+                "game_state": self.game_state,
+                "game_setup": self.game_setup,
+                "callback_data": event.data,
+            }
+            screen_content = event.data.get("screen_content")
+            if screen_content == "select_player":
+                events = player.character.ability.callback_mnich(data)
+            if events:
+                new_events.extend(events)
+
+        elif event.name == "krukarz_night_choice":
+            player = self.game_state.get_player_by_client_id(event.actor_id)
+            data = {
+                "actor": player,
+                "game_state": self.game_state,
+                "game_setup": self.game_setup,
+                "callback_data": event.data,
+            }
+            screen_content = event.data.get("screen_content")
+            if screen_content == "select_player":
+                events = player.character.ability.callback_krukarz(data)
             if events:
                 new_events.extend(events)
 

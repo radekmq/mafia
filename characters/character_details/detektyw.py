@@ -96,6 +96,35 @@ def format_shown_players(shown_players):
     )
 
 
+def get_recluse_registration_for_detektyw(players):
+    """Return the Recluse player and how they register for Detektyw."""
+    recluse_player = next(
+        (
+            candidate
+            for candidate in players
+            if candidate.character and candidate.character.name == "Pustelnik"
+        ),
+        None,
+    )
+    if recluse_player is None:
+        return None, None
+
+    recluse_heuristic = getattr(recluse_player.character, "heuristic", None)
+    if recluse_heuristic is None:
+        return recluse_player, None
+
+    return recluse_player, recluse_heuristic.detektyw_asks_for_demon(recluse_player)
+
+
+def is_registered_as_minion(game_setup, character_name):
+    """Check whether the registered character is a minion from the scenario."""
+    minion_names = {
+        character.name
+        for character in game_setup.get_dict_of_characters().get("minion", [])
+    }
+    return character_name in minion_names
+
+
 def ability_setup_fake(data):
     """Fake setup for the Detektyw's ability, used when information is false."""
     log_info("Detektyw is drunk, false information will be provided.")
@@ -104,6 +133,7 @@ def ability_setup_fake(data):
         data["game_state"],
         data["game_setup"],
     )
+    player.character.used_fake_setup = True
     players = game_state.players
     character_pool = game_setup.get_list_of_characters_by_type(RoleType.MINION)
     character_pool = [char.character for char in character_pool]
@@ -170,6 +200,12 @@ def ability_setup_original(data):
     players = game_state.players
     if player is None:
         return
+    player.character.used_fake_setup = False
+
+    (
+        recluse_player,
+        recluse_registered_character,
+    ) = get_recluse_registration_for_detektyw(players)
 
     minions_in_play = [
         candidate
@@ -185,14 +221,35 @@ def ability_setup_original(data):
         player.player_status = "Detektyw nie otrzymuje informacji o Minionie."
         return
 
-    minion_player = random.choice(minions_in_play)
+    minion_candidates = list(minions_in_play)
+    if (
+        recluse_player is not None
+        and recluse_player.client_id != player.client_id
+        and is_registered_as_minion(game_setup, recluse_registered_character)
+    ):
+        minion_candidates.append(recluse_player)
+
+    shown_minion_player = random.choice(minion_candidates)
+    shown_as_minion_name = shown_minion_player.character.name
+    if shown_minion_player == recluse_player:
+        shown_as_minion_name = recluse_registered_character
+
     decoy_candidates = [
         candidate
         for candidate in players
-        if candidate.client_id != minion_player.client_id
+        if candidate.client_id != shown_minion_player.client_id
         and candidate.client_id != player.client_id
     ]
-    shown_players = [minion_player]
+
+    if shown_minion_player == recluse_player:
+        decoy_candidates = [
+            candidate
+            for candidate in decoy_candidates
+            if candidate.character is not None
+            and candidate.character.name != shown_as_minion_name
+        ]
+
+    shown_players = [shown_minion_player]
     if decoy_candidates:
         shown_players.append(random.choice(decoy_candidates))
     else:
@@ -202,7 +259,7 @@ def ability_setup_original(data):
 
     shown_players_text = format_shown_players(shown_players)
     player.player_status = (
-        f"Detektyw wie, że jeden z graczy ma postać {minion_player.character.name}:\n"
+        f"Detektyw wie, że jeden z graczy ma postać {shown_as_minion_name}:\n"
         f"{shown_players_text} \n\n"
         f"Twoja wiedza nie może zostać zniekształcona przez otrucie."
     )
@@ -251,8 +308,10 @@ class DetektywCharacter(Character):
             "Detektyw dowiaduje się, że konkretny Minion jest w grze, "
             "ale nie kto go gra."
         )
+        self.used_fake_setup = False
 
-    def evaluate_knowledge_score(self):
+    def evaluate_knowledge_score(self, _) -> float:
         """Evaluate knowledge score based on the information they have."""
-        score = 2.0
-        return score
+        if self.used_fake_setup:
+            return -1.0
+        return 2.0

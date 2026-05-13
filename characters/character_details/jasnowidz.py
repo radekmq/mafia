@@ -5,6 +5,96 @@ from game_events import Event
 from logger import log_info
 from player import PlayerStatus
 
+# = = = = = = = = = = = = =  UTILITIES = = = = = = = = = = = = = =
+
+
+def is_recluse_player(target_player):
+    """Check whether the selected player is the Recluse/Pustelnik."""
+    return target_player is not None and target_player.character.name == "Pustelnik"
+
+
+def is_demon_player(target_player):
+    """Check whether the selected player is an actual demon."""
+    return (
+        target_player is not None
+        and target_player.character.role_type == RoleType.DEMON
+    )
+
+
+def get_cached_recluse_imp_registration(player, target_player):
+    """Return whether this Jasnowidz already learned that given Recluse registers as Imp."""
+    recluse_registrations = getattr(player.character, "recluse_registered_as_imp", {})
+    return recluse_registrations.get(target_player.client_id, False)
+
+
+def cache_recluse_imp_registration(player, target_player):
+    """Persist that this Recluse registers as Imp for this Jasnowidz."""
+    recluse_registrations = getattr(player.character, "recluse_registered_as_imp", {})
+    recluse_registrations[target_player.client_id] = True
+    player.character.recluse_registered_as_imp = recluse_registrations
+
+
+def should_recluse_register_as_imp_for_jasnowidz(player, selected_targets):
+    """Check whether Jasnowidz may get a false Demon result because of Recluse."""
+    recluse_targets = [
+        target for target in selected_targets if is_recluse_player(target)
+    ]
+    if not recluse_targets:
+        return None
+
+    for recluse_target in recluse_targets:
+        if get_cached_recluse_imp_registration(player, recluse_target):
+            log_info(
+                f"Jasnowidz uses cached Recluse->Imp registration for player: {recluse_target.name}"
+            )
+            return recluse_target
+
+    if len(selected_targets) != 2:
+        return None
+
+    for recluse_target in recluse_targets:
+        other_target = next(
+            (
+                target
+                for target in selected_targets
+                if target.client_id != recluse_target.client_id
+            ),
+            None,
+        )
+        if other_target is None or is_demon_player(other_target):
+            continue
+
+        recluse_heuristic = getattr(recluse_target.character, "heuristic", None)
+        if recluse_heuristic is None:
+            continue
+
+        if recluse_heuristic.should_recluse_fake("Jasnowidz"):
+            cache_recluse_imp_registration(player, recluse_target)
+            log_info(f"Recluse registered as Imp for Jasnowidz: {recluse_target.name}")
+            return recluse_target
+
+    return None
+
+
+def ability_callback_i_see_you(data):
+    """Handle callback for the Jasnowidz's ability."""
+    player, game_state, game_setup, callback_data = (
+        data["target"],
+        data["game_state"],
+        data["game_setup"],
+        data["callback_data"],
+    )
+    log_info(f"Jasnowidz's ability callback called with data: {callback_data}")
+    player.character.selected_players_to_see = callback_data.get("selected_players")
+
+    event = Event(
+        name="confirm_night_action",
+        actor_id=player.client_id,
+        priority=50,
+    )
+    return [event]
+
+
 # = = = = = = = = = = = = =  RENDER PAGE = = = = = = = = = = = = =
 
 
@@ -107,26 +197,10 @@ def ability_setup(data):
         data["game_state"],
         data["game_setup"],
     )
-    player.character.cached_fake_night_result = {}
-
-
-def ability_callback_i_see_you(data):
-    """Handle callback for the Jasnowidz's ability."""
-    player, game_state, game_setup, callback_data = (
-        data["target"],
-        data["game_state"],
-        data["game_setup"],
-        data["callback_data"],
-    )
-    log_info(f"Jasnowidz's ability callback called with data: {callback_data}")
-    player.character.selected_players_to_see = callback_data.get("selected_players")
-
-    event = Event(
-        name="confirm_night_action",
-        actor_id=player.client_id,
-        priority=50,
-    )
-    return [event]
+    if not hasattr(player.character, "cached_fake_night_result"):
+        player.character.cached_fake_night_result = {}
+    if not hasattr(player.character, "recluse_registered_as_imp"):
+        player.character.recluse_registered_as_imp = {}
 
 
 def ability_night_resolution_original(data):
@@ -144,14 +218,27 @@ def ability_night_resolution_original(data):
     ):
         selected_players = player.character.selected_players_to_see
         log_info(f"Jasnowidz selected players to see: {selected_players}")
+        selected_targets = [
+            game_state.get_player_by_client_id(selected_player_id)
+            for selected_player_id in selected_players
+        ]
 
         is_deamon_found = False
-        for selected_player_id in selected_players:
-            target_player = game_state.get_player_by_client_id(selected_player_id)
-            if target_player.character.role_type == RoleType.DEMON:
+        for target_player in selected_targets:
+            if is_demon_player(target_player):
                 player.jasnowidz_status = "Wiesz, że wśród wskazanych przez Ciebie wybranych graczy jest Demon."
                 is_deamon_found = True
                 break
+
+        if not is_deamon_found:
+            recluse_registered_as_imp = should_recluse_register_as_imp_for_jasnowidz(
+                player, selected_targets
+            )
+            if recluse_registered_as_imp is not None:
+                player.jasnowidz_status = (
+                    "Wiesz, że wśród wskazanych przez Ciebie graczy jest Demon."
+                )
+                is_deamon_found = True
 
         if is_deamon_found:
             player.jasnowidz_status = (
@@ -267,11 +354,12 @@ class JasnowidzCharacter(Character):
         self.useful_yes_results = 0
         self.confirmed_no_results = 0
 
-    def evaluate_knowledge_score(self):
-        score = 0
+    def evaluate_knowledge_score(self, _) -> float:
+        """Evaluate knowledge score based on the information they have."""
+        score = 0.0
         # liczba trafień zawężających demona
-        score += self.useful_yes_results * 2
+        score += self.useful_yes_results * 2.0
         # liczba potwierdzonych NO
-        score += self.confirmed_no_results * 1
+        score += self.confirmed_no_results * 1.0
 
         return score

@@ -14,7 +14,7 @@ def is_recluse_player(player):
 
 def get_recluse_registration_for_empata(player):
     """Return how the Recluse registers for Empata."""
-    recluse_heuristic = getattr(player.character, "heuristic", None)
+    recluse_heuristic = getattr(player.character, "recluse_heuristic", None)
     if recluse_heuristic is None:
         return None
 

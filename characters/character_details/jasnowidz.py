@@ -64,7 +64,7 @@ def should_recluse_register_as_imp_for_jasnowidz(player, selected_targets):
         if other_target is None or is_demon_player(other_target):
             continue
 
-        recluse_heuristic = getattr(recluse_target.character, "heuristic", None)
+        recluse_heuristic = getattr(recluse_target.character, "recluse_heuristic", None)
         if recluse_heuristic is None:
             continue
 

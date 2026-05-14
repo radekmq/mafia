@@ -108,4 +108,4 @@ class PustelnikCharacter(Character):
         )
 
     def set_recluse_heuristic(self, heuristic):
-        self.heuristic = heuristic
+        self.recluse_heuristic = heuristic

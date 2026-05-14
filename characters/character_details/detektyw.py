@@ -109,7 +109,7 @@ def get_recluse_registration_for_detektyw(players):
     if recluse_player is None:
         return None, None
 
-    recluse_heuristic = getattr(recluse_player.character, "heuristic", None)
+    recluse_heuristic = getattr(recluse_player.character, "recluse_heuristic", None)
     if recluse_heuristic is None:
         return recluse_player, None
 

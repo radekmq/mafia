@@ -51,7 +51,7 @@ class Scenario:
     def get_list_of_characters_by_type(
         self, role_types: list, available_only: bool = False
     ) -> list:
-        """Get a list of available characters in the scenario filtered by role type."""
+        """Get a list of characters in the scenario filtered by role type."""
         if not isinstance(role_types, list):
             role_types = [role_types]
         return_list = []
@@ -78,6 +78,21 @@ class Scenario:
                     cs
                     for cs in self.list_of_characters
                     if cs.character.role_type == role_type
+                ]
+            )
+        return return_list
+
+    def get_list_of_unassigned_characters_by_type(self, role_types: list) -> list:
+        """Get a list of unassigned characters in the scenario filtered by role type."""
+        if not isinstance(role_types, list):
+            role_types = [role_types]
+        return_list = []
+        for role_type in role_types:
+            return_list.extend(
+                [
+                    cs
+                    for cs in self.list_of_characters
+                    if cs.character.role_type == role_type and cs.assigned_in_play == 0
                 ]
             )
         return return_list

@@ -149,6 +149,14 @@ def ability_night_resolution_original(data):
         return
 
     revealed_role_name = player.chosen_by_krukarz.character.name
+    recluse_heuristic = getattr(
+        player.chosen_by_krukarz.character, "recluse_heuristic", None
+    )
+    if recluse_heuristic is not None:
+        revealed_role_name = recluse_heuristic.krukarz_asks_for_character(
+            player.chosen_by_krukarz
+        )
+
     player.player_status = f"Krukarz wie, że postać gracza {player.chosen_by_krukarz.name} to: {revealed_role_name}."
     player.character.has_received_information = True
     log_info(

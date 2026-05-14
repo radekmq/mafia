@@ -104,7 +104,7 @@ def is_evil_for_kucharz(player, game_setup):
     if player.character.name != "Pustelnik":
         return False
 
-    recluse_heuristic = getattr(player.character, "heuristic", None)
+    recluse_heuristic = getattr(player.character, "recluse_heuristic", None)
     if recluse_heuristic is None:
         return False
 

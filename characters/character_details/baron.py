@@ -107,13 +107,12 @@ def ability_setup_original(data):
         return
 
     townsfolk_characters = [
-        player for player in players if player.character.role_type == RoleType.TOWNSFOLK
+        p for p in players if p.character.role_type == RoleType.TOWNSFOLK
     ]
 
-    # Randomly select 2 players from the list of townsfolk characters
     if len(townsfolk_characters) < 2:
         player.player_status = (
-            "Zbyt mało graczy aby zdolność Bibliotekarki mogła wskazać dwóch graczy."
+            "Zbyt mało graczy aby zdolność Barona mogła wskazać dwóch graczy."
         )
         return
     chosen_players = random.sample(townsfolk_characters, 2)
@@ -121,16 +120,18 @@ def ability_setup_original(data):
     # Randomly assign new outsider character to one of the chosen players
     available_outsiders = [
         char.character
-        for char in game_setup.get_list_of_characters_by_type(RoleType.OUTSIDER)
+        for char in game_setup.get_list_of_unassigned_characters_by_type(
+            RoleType.OUTSIDER
+        )
     ]
 
-    # Randomly select 2 outsider characters from the available pool, should not repeat the same character
     if len(available_outsiders) < 2:
-        player.player_status = "Zbyt mało Outsiderów w puli, aby przypisać do graczy."
+        player.player_status = (
+            "Zbyt mało dostępnych Outsiderów w puli, aby przypisać do graczy."
+        )
         return
     selected_outsiders = random.sample(available_outsiders, 2)
 
-    # Assign the selected outsider characters to the chosen players
     for i, chosen_player in enumerate(chosen_players):
         chosen_player.character = selected_outsiders[i]
 

@@ -95,6 +95,11 @@ class RecluseHeuristic:
             return self.get_recluse_registered_character("Grabarz")
         return executed_player.character.name
 
+    def krukarz_asks_for_character(self, target_player):
+        if target_player.character.name == "Pustelnik":
+            return self.get_recluse_registered_character("Krukarz")
+        return target_player.character.name
+
     def empata_asks_for_neighbors(self, player):
         if player.character.name == "Pustelnik":
             return self.get_recluse_registered_character("Empata")

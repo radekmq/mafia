@@ -106,7 +106,7 @@ def ability_night_resolution_original(data):
         return None
 
     executed_character_name = executed_player.character.name
-    recluse_heuristic = getattr(executed_player.character, "heuristic", None)
+    recluse_heuristic = getattr(executed_player.character, "recluse_heuristic", None)
     if recluse_heuristic is not None:
         executed_character_name = recluse_heuristic.grabarz_asks_for_character(
             executed_player

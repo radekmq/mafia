@@ -272,6 +272,18 @@ def ability_night_resolution_fake(data):
         selected_players = player.character.selected_players_to_see
         log_info(f"Jasnowidz selected players to see: {selected_players}")
 
+        selected_targets = [
+            game_state.get_player_by_client_id(selected_player_id)
+            for selected_player_id in selected_players
+        ]
+
+        is_deamon_found = False
+        for target_player in selected_targets:
+            if is_demon_player(target_player):
+                player.jasnowidz_status = "Wiesz, że wśród wskazanych przez Ciebie wybranych graczy jest Demon."
+                is_deamon_found = True
+                break
+
         random_result = player.character.cached_fake_night_result.get(
             frozenset(selected_players)
         )
@@ -280,7 +292,11 @@ def ability_night_resolution_fake(data):
                 f"Using cached fake night result for selected players: {random_result}"
             )
         else:
-            random_result = random.choice([True, False])
+            # If demon was found, we want to ensure that the fake result is supporting evil
+            if is_deamon_found:
+                random_result = False
+            else:
+                random_result = random.choice([True, False])
             player.character.cached_fake_night_result[
                 frozenset(selected_players)
             ] = random_result

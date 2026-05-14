@@ -99,12 +99,15 @@ def ability_setup(data):
 
 def ability_callback_krukarz(data):
     """Handle callback for the Krukarz's ability."""
-    player, callback_data = (
+    player, game_state, callback_data = (
         data["actor"],
+        data["game_state"],
         data["callback_data"],
     )
     log_info(f"Krukarz's ability callback called with data: {callback_data}")
-    player.chosen_by_krukarz = callback_data.get("selected_player")
+    player.chosen_by_krukarz = game_state.get_player_by_client_id(
+        callback_data.get("selected_player")
+    )
 
     event = Event(
         name="confirm_night_action",
@@ -139,26 +142,18 @@ def ability_night_resolution_original(data):
         log_info("Krukarz did not choose any player to learn about.")
         return
 
-    log_info(f"Krukarz's chosen player: {player.chosen_by_krukarz}")
-    chosen_player = next(
-        (
-            candidate
-            for candidate in game_state.players
-            if candidate.client_id == player.chosen_by_krukarz
-        ),
-        None,
-    )
+    log_info(f"Krukarz's chosen player: {player.chosen_by_krukarz.name}")
 
-    if chosen_player is None or chosen_player.character is None:
+    if player.chosen_by_krukarz.character is None:
         log_info("Chosen player not found or has no character.")
         return
 
-    revealed_role_name = chosen_player.character.name
-    player.player_status = (
-        f"Krukarz wie, że postać gracza {chosen_player.name} to: {revealed_role_name}."
-    )
+    revealed_role_name = player.chosen_by_krukarz.character.name
+    player.player_status = f"Krukarz wie, że postać gracza {player.chosen_by_krukarz.name} to: {revealed_role_name}."
     player.character.has_received_information = True
-    log_info(f"Krukarz learns that {chosen_player.name} is {revealed_role_name}.")
+    log_info(
+        f"Krukarz learns that {player.chosen_by_krukarz.name} is {revealed_role_name}."
+    )
 
 
 def ability_night_resolution_fake(data):
@@ -173,12 +168,16 @@ def ability_night_resolution_fake(data):
 
     player.player_status = "Krukarz nie otrzymał żadnej informacji, ponieważ nie został wyeliminowany tej nocy."
 
-    if (
-        game_state.nominated_by_imp_to_die is not player
-        or player.alive != PlayerStatus.DEAD
-    ):
+    if game_state.nominated_by_imp_to_die is not player or player.is_alive():
         log_info(
             "Krukarz was not eliminated by the Imp. No fake information is revealed."
+        )
+        return
+
+    if player.chosen_by_krukarz is None:
+        log_info("Krukarz did not choose any player to learn about.")
+        player.player_status = (
+            " Krukarz nie wybrał żadnego gracza, o którym chciałby się dowiedzieć."
         )
         return
 
@@ -187,27 +186,26 @@ def ability_night_resolution_fake(data):
         character
         for characters in all_characters.values()
         for character in characters
-        if character.name != "Krukarz"
+        if character.route != player.chosen_by_krukarz.character.route
+        and character.route != player.character.route
     ]
+    log_info(
+        f"All characters available for Krukarz: {[char.name for char in available_characters]}"
+    )
 
     if not available_characters:
         log_info("No available fake characters for Krukarz.")
         return
 
     shown_character = random.choice(available_characters)
-    chosen_player = next(
-        (
-            candidate
-            for candidate in game_state.players
-            if candidate.client_id == player.chosen_by_krukarz
-        ),
-        None,
-    )
+
     chosen_player_name = (
-        chosen_player.name if chosen_player is not None else "wybranego gracza"
+        player.chosen_by_krukarz.name
+        if player.chosen_by_krukarz is not None
+        else "brak wyboru"
     )
 
-    player.player_status = f"Krukarz wie, że postać gracza {chosen_player_name} to: {shown_character.name}."
+    player.player_status = f"Krukarz wie, że postać gracza {player.chosen_by_krukarz.name} to: {shown_character.name}."
     player.character.has_received_information = True
     log_info(
         f"Krukarz receives fake info: {chosen_player_name} appears as {shown_character.name}."

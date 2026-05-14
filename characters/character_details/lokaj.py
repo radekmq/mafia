@@ -71,11 +71,8 @@ def render_night_resolution(game_engine, current_player):
     player_character = current_player.character
     player_status = "Nie wybrałeś jeszcze Pana."
     if current_player.butlers_master is not None:
-        master_player = game_engine.game_state.get_player_by_client_id(
-            current_player.butlers_master
-        )
-        if master_player is not None:
-            player_status = f"Zobowiązałeś się do służby dla Pana: {master_player.name}"
+        if current_player.butlers_master is not None:
+            player_status = f"Zobowiązałeś się do służby dla Pana: {current_player.butlers_master.name}"
     if current_player.alive == PlayerStatus.DEAD:
         player_status = "Niestety Twoja zdolność już nie działa."
 
@@ -116,7 +113,7 @@ def ability_callback_butler(data):
         data["callback_data"],
     )
     log_info(f"Lokaj's ability callback called with data: {callback_data}")
-    player.butlers_master = callback_data.get("selected_player")
+    player.f = game_state.get_player_by_client_id(callback_data.get("selected_player"))
 
     event = Event(
         name="confirm_night_action",
@@ -177,7 +174,7 @@ class LokajCharacter(Character):
             log_info(f"Lokaj {player.name} has no master and cannot vote YES.")
             return False
 
-        master_player = game_state.get_player_by_client_id(player.butlers_master)
+        master_player = player.butlers_master
         if (
             master_player
             and master_player.alive == PlayerStatus.ALIVE

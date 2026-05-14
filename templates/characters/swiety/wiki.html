@@ -1,36 +1,36 @@
 {% extends "base.html" %}
 
-{% block title %}Żołnierz{% endblock %}
+{% block title %}Święty{% endblock %}
 
 {% block content %}
 
 <div style="overflow-x:auto;" class="container">
-  <h3>Truciciel</h3>
+  <h3>Święty</h3>
 
   <button type="button" onclick="window.location.href='{{ back_url }}'">Wróć do listy postaci</button>
   <button type="button" onclick="window.location.href='/lobby'">Wróć do gry</button>
 
   <table>
     <tr><td style="text-align: center;">
-      <img style="width: 40%; height: auto;" src="{{ url_for('static', filename='images/zolnierz.png') }}">
+      <img style="width: 40%; height: auto;" src="{{ url_for('static', filename='images/swiety.png') }}">
     </td></tr>
     <tr>
       <td>
-        Jesteś bezpieczny przed Demonem. Żołnierz nie może zostać zabity przez Demona.
+        Jeśli umrzesz przez egzekucję, twoja drużyna przegrywa. Święty kończy grę, jeśli zostanie stracony.
 
         <ul>
-          <li>Żołnierz nie może umrzeć od zdolności Demona. Jeśli więc Imp zaatakuje Żołnierza w nocy, nic się nie dzieje. Nikt nie umiera. Imp nie może wybrać innego gracza do zaatakowania zamiast niego.</li>
-          <li>Żołnierz nadal może zginąć w wyniku egzekucji, nawet jeśli nominującym był Demon. Żołnierz jest chroniony przed zdolnością zabijania Demona, a nie przed działaniami gracza będącego Demonem.</li>
+          <li>Jeśli Święty umrze w wyniku egzekucji, gra natychmiast się kończy. Dobrzy przegrywają, a źli wygrywają.</li>
+          <li>Jeśli Święty umrze w inny sposób niż egzekucja — na przykład zostanie zabity przez Demona — gra toczy się dalej.</li>
         </ul>
       </td>
     </tr>
   </table>
 
-  <blockquote>Imp atakuje Żołnierza. Żołnierz nie umiera, więc tej nocy nikt nie ginie.</blockquote>
+  <blockquote>Przy życiu pozostaje siedmiu graczy i trwa faza nominacji. Święty otrzymuje cztery głosy i ma zostać stracony. Następnie nominowany zostaje Baron, ale otrzymuje tylko trzy głosy. Tego dnia nie dochodzi już do żadnych nominacji. Święty zostaje stracony, a źli wygrywają.</blockquote>
 
-  <blockquote>Imp atakuje Żołnierza. Żołnierz umiera, ponieważ tak naprawdę jest Pijakiem.</blockquote>
+  <blockquote>Imp zostaje nominowany i gracze głosują. Gunslinger zabija Świętego. Święty umiera, ale gra toczy się dalej.</blockquote>
 
-  <blockquote>Truciciel zatruwa Żołnierza, a następnie Imp atakuje Żołnierza. Żołnierz umiera, ponieważ nie ma wtedy swojej zdolności.</blockquote>
+  <blockquote>Święty zostaje skazany na egzekucję. Jednak aktywuje się zdolność Scapegoat, więc zamiast niego umiera Scapegoat. Gra trwa dalej, ponieważ Święty faktycznie nie umarł.</blockquote>
 
 </div>
 

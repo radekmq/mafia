@@ -2,14 +2,17 @@
 
 
 from characters.character import RoleType
+from characters.character_details.baron import BaronCharacter
 from characters.character_details.empata import EmpataCharacter
 from characters.character_details.grabarz import GrabarzCharacter
 from characters.character_details.imp import ImpCharacter
 from characters.character_details.jasnowidz import JasnowidzCharacter
 from characters.character_details.krukarz import KrukarzCharacter
+from characters.character_details.lokaj import LokajCharacter
 from characters.character_details.mnich import MnichCharacter
+from characters.character_details.pijak import PijakCharacter
 from characters.character_details.pustelnik import PustelnikCharacter
-from characters.character_details.skarlet import SkarletCharacter
+from characters.character_details.swiety import SwietyCharacter
 from characters.character_details.zolnierz import ZolnierzCharacter
 from characters.scenario import Scenario
 from logger import log_info
@@ -35,14 +38,15 @@ class TroubleBrewingScenario(Scenario):
         self.add_character(KrukarzCharacter())
 
         # ====== OUTSIDER ======
-        # self.add_character(PijakCharacter())
-        # self.add_character(SwietyCharacter())
-        # self.add_character(LokajCharacter())
+        self.add_character(PijakCharacter())
+        self.add_character(SwietyCharacter())
+        self.add_character(LokajCharacter())
         self.add_character(PustelnikCharacter())
 
         # ====== MINIONKI ======
         # self.add_character(TrucicielCharacter())
-        self.add_character(SkarletCharacter())
+        # self.add_character(SkarletCharacter())
+        self.add_character(BaronCharacter())
 
         # ====== DEMONY ======
         self.add_character(ImpCharacter())

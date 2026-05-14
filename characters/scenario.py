@@ -51,7 +51,7 @@ class Scenario:
     def get_list_of_characters_by_type(
         self, role_types: list, available_only: bool = False
     ) -> list:
-        """Get a list of characters in the scenario filtered by role type."""
+        """Get a list of available characters in the scenario filtered by role type."""
         if not isinstance(role_types, list):
             role_types = [role_types]
         return_list = []
@@ -111,4 +111,6 @@ class Scenario:
         return CHARACTERS_BY_TYPE
 
     def set_recluse_heuristic(self, heuristic):
-        self.get_character_by_route("pustelnik").set_recluse_heuristic(heuristic)
+        recluse = self.get_character_by_route("pustelnik")
+        if recluse:
+            recluse.set_recluse_heuristic(heuristic)

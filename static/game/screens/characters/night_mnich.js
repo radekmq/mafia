@@ -47,6 +47,28 @@ window.Screens["night_mnich"] = function(state) {
         return;
     }
 
+    if (screenContent === "confirm_first_night_action") {
+        actionContainer.innerHTML = `
+            <p style="text-align:center;">${data.mnich_status}</p>
+            <div style="text-align:center; margin-top:10px;">
+                <button id="confirm_mnich_first_night" type="button">OK</button>
+            </div>
+        `;
+
+        document.getElementById("confirm_mnich_first_night").onclick = () => {
+            if (!window.socket || typeof window.socket.send !== "function") {
+                console.warn("[night_mnich] Socket not available for Mnich confirmation send");
+                return;
+            }
+
+            window.socket.send({
+                type: "confirm_night_action",
+                confirmed_night_action: true,
+            });
+        };
+        return;
+    }
+
 
     if (screenContent === "select_player") {
         const title = "Wybierz gracza, którego chcesz ochraniać przed Demonem:";

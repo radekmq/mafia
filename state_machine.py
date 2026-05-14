@@ -135,7 +135,17 @@ class StateMachine:
         )
         self.dispatcher.enqueue_event(event)
 
-    def on_enter_calculate_game_score(self):
+    def on_enter_initial_game_score_calculation(self):
+        """Handle on enter calculate game score."""
+        log_info("[SM on enter] Obliczanie wyniku gry")
+
+        event = Event(
+            name="enter_game_score_calculation",
+            actor_id="SYSTEM",
+        )
+        self.dispatcher.enqueue_event(event)
+
+    def on_enter_night_resolution_game_score_calculation(self):
         """Handle on enter calculate game score."""
         log_info("[SM on enter] Obliczanie wyniku gry")
 
@@ -188,7 +198,8 @@ states = [
     "execution",
     "day_game_conditions",
     "game_over",
-    "calculate_game_score",
+    "initial_game_score_calculation",
+    "night_resolution_game_score_calculation",
 ]
 
 transitions = [
@@ -201,11 +212,11 @@ transitions = [
     {
         "trigger": "next_phase",
         "source": "players_introduction",
-        "dest": "calculate_game_score",
+        "dest": "initial_game_score_calculation",
     },
     {
         "trigger": "game_score_calculated",
-        "source": "calculate_game_score",
+        "source": "initial_game_score_calculation",
         "dest": "night_actions",
     },
     # NOC
@@ -228,11 +239,11 @@ transitions = [
     {
         "trigger": "all_conditions_resolved",
         "source": "night_game_conditions",
-        "dest": "calculate_game_score",
+        "dest": "night_resolution_game_score_calculation",
     },
     {
         "trigger": "game_score_calculated",
-        "source": "calculate_game_score",
+        "source": "night_resolution_game_score_calculation",
         "dest": "day_discussions",
     },
     # DZIEŃ

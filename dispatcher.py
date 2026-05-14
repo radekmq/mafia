@@ -278,13 +278,17 @@ class Dispatcher:
         elif event.name == "enter_game_score_calculation":
             self.recluse_heuristic.evaluate_game_advantage()
             new_event = Event(
-                    name="game_score_calculated",
-                    actor_id="SYSTEM",
-                    priority=90,
-                )
-                new_events.append(new_event)
+                name="game_score_calculated",
+                actor_id="SYSTEM",
+                priority=90,
+            )
+            new_events.append(new_event)
+
+        elif event.name == "game_score_calculated":
+            self.state_machine.game_score_calculated()
 
         elif event.name == "enter_day_discussions":
+            self.game_state.increment_day()
             for player in self.game_state.players:
                 new_events.append(
                     update_state_view(player, {"screen": "day_discussion"})
@@ -617,5 +621,6 @@ class Dispatcher:
 
         elif event.name == "exit_game_over":
             self.game_state.reset_game()
+            self.game_setup.reset_setup()
 
         return new_events

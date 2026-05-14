@@ -18,11 +18,12 @@ def log_players_status_table(game_state):
         "Nazwa gracza",
         "Seat",
         "Postać",
-        "Dodatkowe postaci",
+        "Rola",
         "Pijany",
         "Poisoned",
         "Alive",
         "Protected",
+        "Dodatkowe postaci",
     ]
 
     rows = []
@@ -45,11 +46,12 @@ def log_players_status_table(game_state):
                 player.name,
                 player.seat_no,
                 character_name,
-                additional,
+                player.character.role_type.value if player.character else "-",
                 drunk,
                 poisoned,
                 alive,
                 protected,
+                additional,
             ]
         )
 

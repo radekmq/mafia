@@ -26,10 +26,10 @@ def render_night_action(game_engine, current_player):
 
     screen_content = "confirm_night_action"
     player_status = "Potwierdź swoją nocną akcję."
-    if current_player.is_night_action_done():
-        log_info("Current player has already completed their night action.")
+    if current_player.is_night_action_done() or not current_player.is_alive():
+        log_info("Current player has already completed their night action or is dead.")
         screen_content = "action_completed"
-        player_status = "Potwierdziłeś swoją nocną akcję."
+        player_status = "Potwierdziłeś swoją nocną akcję lub ona nie działa."
     player_character = current_player.character
 
     return {

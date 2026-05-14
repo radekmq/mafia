@@ -30,10 +30,7 @@ def render_night_action(game_engine, current_player):
     player_character = current_player.character
 
     krukarz_status = "Już wykonałeś swoją nocną akcję!"
-    if (
-        current_player.is_night_action_done()
-        or current_player.alive == PlayerStatus.DEAD
-    ):
+    if current_player.is_night_action_done() or not current_player.is_alive():
         log_info("Current player has already completed their night action or is dead.")
         screen_content = "krukarz_action_completed"
         krukarz_status = "Wykonałeś już swoją nocną akcję lub ona nie działa."
@@ -81,7 +78,7 @@ def render_night_resolution(game_engine, current_player):
             "player_link": player_character.route,
             "player_image": player_character.image_path,
             "player_info": player_character.description,
-            "player_status": "Krukarz nie wykonuje specjalnej akcji w nocy.",
+            "player_status": current_player.player_status,
             "screen_content": "action_completed",
         },
     }
@@ -127,6 +124,9 @@ def ability_night_resolution_original(data):
     )
 
     player.player_status = "Krukarz nie otrzymał żadnej informacji, ponieważ nie został wyeliminowany tej nocy."
+    log_info(
+        f"Krukarz knows, that IMP eliminated this night: {game_state.nominated_by_imp_to_die.name if game_state.nominated_by_imp_to_die else 'None'}"
+    )
 
     if (
         game_state.nominated_by_imp_to_die is not player

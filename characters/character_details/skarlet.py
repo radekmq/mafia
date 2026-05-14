@@ -26,10 +26,10 @@ def render_night_action(game_engine, current_player):
 
     screen_content = "confirm_night_action"
     player_status = "Potwierdź swoją nocną akcję."
-    if current_player.is_night_action_done():
-        log_info("Current player has already completed their night action.")
+    if current_player.is_night_action_done() or not current_player.is_alive():
+        log_info("Current player has already completed their night action or is dead.")
         screen_content = "action_completed"
-        player_status = "Potwierdziłeś swoją nocną akcję."
+        player_status = "Potwierdziłeś swoją nocną akcję lub ona nie działa."
     player_character = current_player.character
 
     return {
@@ -117,6 +117,8 @@ class SkarletCharacter(Character):
 
         if skarlet_player is None:
             log_info("Skarlet is not in the game, skipping game over check.")
+        elif not skarlet_player.is_alive():
+            log_info("Skarlet is dead, skipping game over check.")
         else:
             is_any_demon_alive = any(
                 player.is_alive()
@@ -144,10 +146,13 @@ class SkarletCharacter(Character):
                 log_info("No Demon player found to copy additional characters from.")
                 return []
 
-            skarlet_player.character.role_type = RoleType.DEMON
             skarlet_player.additional_characters = list(
                 demon_player.additional_characters or []
             )
+            demon_player.additional_characters = []
+            tmp_skarlet = skarlet_player.character
+            skarlet_player.character = demon_player.character
+            demon_player.character = tmp_skarlet
 
             log_info(
                 "Skarlet becomes the Demon and receives the Demon additional characters list."

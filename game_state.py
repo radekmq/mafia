@@ -19,7 +19,6 @@ class GameState:
         self,
         players: list[Player] | None = None,
         day: int = 0,
-        night: int = 0,
         action_truciciel_done: bool = False,
         kruk_died_last_night: bool = False,
         virgin_nomination_counter: int = 0,
@@ -32,7 +31,6 @@ class GameState:
         """Handle init."""
         self.players = players or []
         self.day = day
-        self.night = night
         self.action_truciciel_done = action_truciciel_done
         self.last_executed_player = None
 
@@ -139,7 +137,6 @@ class GameState:
         """Handle reset game."""
         with self.lock:
             self.day = 0
-            self.night = 0
             self.action_truciciel_done = False
             self.last_executed_player = None
             self.nominated_by_imp_to_die = None
@@ -156,6 +153,9 @@ class GameState:
             self.game_over_conditions_met = False
             for player in self.players:
                 player.reset_status()
+            # Reset also the scenario setup (characters pool)
+            if hasattr(self, "game_setup") and self.game_setup is not None:
+                self.game_setup.reset_setup()
 
     def add_new_player(self, name, seat_no, moderator=False, password=None):
         is_admin = False
@@ -458,3 +458,8 @@ class GameState:
         """Get player protected by Mnich."""
         with self.lock:
             return self.player_protected_by_mnich
+
+    def increment_day(self):
+        """Increment day counter."""
+        with self.lock:
+            self.day += 1

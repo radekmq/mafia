@@ -2,6 +2,7 @@
 from dataclasses import dataclass
 
 from characters.character import Character, RoleType
+from logger import log_info
 
 
 @dataclass
@@ -24,7 +25,11 @@ class Scenario:
 
     def reset_setup(self):
         """Reset the assigned_in_play count for each character."""
+        log_info("Resetting assigned_in_play for all characters.")
         for character_setup in self.list_of_characters:
+            log_info(
+                f"Resetting {character_setup.character.name}: {character_setup.assigned_in_play} -> 0"
+            )
             character_setup.assigned_in_play = 0
 
     def get_character_by_route(self, route: str) -> Character:
@@ -61,7 +66,13 @@ class Scenario:
                     ]
                 )
             return return_list
+        log_info("Filtering characters by role type.")
         for role_type in role_types:
+            log_info(f"Role type: {role_type}")
+            for cs in self.list_of_characters:
+                log_info(
+                    f"Character: {cs.character.name}, Role: {cs.character.role_type}, Assigned: {cs.assigned_in_play}"
+                )
             return_list.extend(
                 [
                     cs

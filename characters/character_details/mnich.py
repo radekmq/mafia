@@ -25,17 +25,16 @@ def render_introduction(game_engine, current_player):
 def render_night_action(game_engine, current_player):
     """Render effect of the Mnich's ability during the night action phase."""
     log_info("Mnich's ability effect for night_minion_action called.")
-    player_character = current_player.character
-    game_engine.game_state.reset_player_protected_by_mnich()
 
     mnich_status = "Już wykonałeś swoją nocną akcję!"
-    if (
-        current_player.is_night_action_done()
-        or current_player.alive == PlayerStatus.DEAD
-    ):
+    if current_player.is_night_action_done() or not current_player.is_alive():
         log_info("Current player has already completed their night action or is dead.")
         screen_content = "mnich_action_completed"
-        mnich_status = "Wykonałeś już swoją nocną akcję lub ona nie działa."
+        mnich_status = "Wykonałeś już swoją nocną akcję lub ona tej nocy nie działa."
+    elif game_engine.game_state.day == 0:
+        log_info("This is the first night for the Mnich")
+        screen_content = "confirm_first_night_action"
+        mnich_status = "Pierwszej nocy Mnich nie wykonuje akcji, ponieważ demon nie może nikogo wyeliminować!"
     else:
         log_info("Rendering Mnich's night action page.")
         screen_content = "select_player"
@@ -46,6 +45,8 @@ def render_night_action(game_engine, current_player):
         for player in game_engine.game_state.players:
             if player.client_id == current_player.client_id or player.character is None:
                 continue
+            if player.alive == PlayerStatus.DEAD:
+                continue
             player_list.append(
                 (
                     f"{player.name} (miejsce: {player.seat_no})",
@@ -53,6 +54,7 @@ def render_night_action(game_engine, current_player):
                 )
             )
     log_info(f"Player list for Mnich's ability effect: {player_list}")
+    player_character = current_player.character
 
     return {
         "screen": "night_mnich",
@@ -73,6 +75,12 @@ def render_night_resolution(game_engine, current_player):
     log_info("Get data for Mnich night resolution.")
     player_character = current_player.character
 
+    # Pobierz gracza chronionego przez Mnicha z game_state
+    protected_player = game_engine.game_state.player_protected_by_mnich
+
+    # Zresetuj ochronę Mnicha
+    game_engine.game_state.reset_player_protected_by_mnich()
+
     return {
         "screen": "night_basic",
         "character_data": {
@@ -80,7 +88,7 @@ def render_night_resolution(game_engine, current_player):
             "player_link": player_character.route,
             "player_image": player_character.image_path,
             "player_info": player_character.description,
-            "player_status": "Mnich nie wykonuje specjalnej akcji w nocy.",
+            "player_status": f"Gracz chroniony przez Mnicha: {protected_player.name if protected_player else 'Brak'}",
             "screen_content": "action_completed",
         },
     }

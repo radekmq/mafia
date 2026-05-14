@@ -131,9 +131,6 @@ class WinnerHeuristic:
 
             penalty = 0.0
             power = self.character_power.get(player.character.name, 0)
-            log_info(
-                f"[WinnerHeuristic] Evaluating misinformation for {player.character.name} with base power {power}."
-            )
 
             if player.poisoned:
                 penalty += 2.0 * power
@@ -149,6 +146,10 @@ class WinnerHeuristic:
 
             if not player.alive == PlayerStatus.ALIVE:
                 penalty *= 0.7
+
+            log_info(
+                f"[WinnerHeuristic] Evaluating misinformation for {player.character.name}: penalty={penalty}, power={power}"
+            )
 
             score -= penalty
 
@@ -285,7 +286,7 @@ class WinnerHeuristic:
             score_player_count
             + score_alive_characters
             + score_good_knowledge
-            - score_misinformation
+            + score_misinformation
             + score_voting_history
             + score_endgame
         )

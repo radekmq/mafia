@@ -30,15 +30,13 @@ def render_night_action(game_engine, current_player):
     imp_status = "Już wykonałeś swoją nocną akcję!"
     player_list = []
 
-    if current_player.character.first_night:
-        log_info("This is the first night for the Imp")
-        current_player.character.first_night = False
-        screen_content = "confirm_first_night_action"
-        imp_status = "Pierwszej nocy IMP nie wykonuje akcji!"
-
-    elif current_player.is_night_action_done():
+    if current_player.is_night_action_done():
         log_info("Current player has already completed their night action.")
         screen_content = "imp_action_completed"
+    elif game_engine.game_state.day == 0:
+        log_info("This is the first night for the Imp")
+        screen_content = "confirm_first_night_action"
+        imp_status = "Pierwszej nocy IMP nie wykonuje akcji!"
     else:
         log_info("Rendering Imp's night action page.")
         screen_content = "select_player_to_kill"
@@ -198,7 +196,6 @@ def ability_setup(data):
         data["target"],
         data["game_setup"],
     )
-    player.character.first_night = True
     list_of_available_good_chars = game_setup.get_list_of_characters_by_type(
         [RoleType.TOWNSFOLK, RoleType.OUTSIDER], available_only=True
     )
@@ -308,12 +305,14 @@ def ability_night_resolution_original(data):
         log_info("Imp killed himself, but there is no replacement candidate.")
         player.imp_kills_player()
     else:
+        tmp_character = game_state.demon_replacement_candidate.character
         game_state.demon_replacement_candidate.character = player.character
         game_state.demon_replacement_candidate.additional_characters = (
             player.additional_characters
         )
         player.imp_kills_player()
         player.additional_characters = []
+        player.character = tmp_character
         log_info(
             f"Player {player.name} dies and new Demon is: {game_state.demon_replacement_candidate.name}"
         )

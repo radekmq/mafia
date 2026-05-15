@@ -49,7 +49,9 @@ def render_night_action(game_engine, current_player):
                     player.client_id,
                 )
             )
-    log_info(f"Player list for Lokaj's ability effect: {player_list}")
+    log_info(
+        f"Player list for Lokaj's ability effect: {[name for name, _ in player_list]}"
+    )
 
     return {
         "screen": "night_lokaj",
@@ -113,7 +115,9 @@ def ability_callback_butler(data):
         data["callback_data"],
     )
     log_info(f"Lokaj's ability callback called with data: {callback_data}")
-    player.f = game_state.get_player_by_client_id(callback_data.get("selected_player"))
+    player.butlers_master = game_state.get_player_by_client_id(
+        callback_data.get("selected_player")
+    )
 
     event = Event(
         name="confirm_night_action",
@@ -135,6 +139,7 @@ ability.callback_butler = DualEffect(
 render_page = RenderPage(
     introduction=DualEffect(
         original=render_introduction,
+        fake=render_introduction,
     ),
     night_action=DualEffect(
         original=render_night_action,
@@ -192,9 +197,13 @@ class LokajCharacter(Character):
 
     def evaluate_knowledge_score(self, player) -> float:
         """Evaluate knowledge score based on the information they have."""
-        if player.butlers_master is not None and player.butlers_master.role_type in {
-            RoleType.TOWNSFOLK,
-            RoleType.OUTSIDER,
-        }:
+        if (
+            player.butlers_master is not None
+            and player.butlers_master.character.role_type
+            in {
+                RoleType.TOWNSFOLK,
+                RoleType.OUTSIDER,
+            }
+        ):
             return 1.0
         return -1.0

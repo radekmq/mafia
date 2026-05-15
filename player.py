@@ -181,6 +181,8 @@ class Player:
         """Set nominated for execution status."""
         with self.lock:
             self.nominated_for_execution = nominated
+        if self.character and hasattr(self.character, "set_nominated"):
+            self.character.set_nominated(True)
 
     def reset_last_vote(self):
         """Reset last vote status."""

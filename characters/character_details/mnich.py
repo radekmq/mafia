@@ -10,6 +10,8 @@ def render_introduction(game_engine, current_player):
     """Render effect of the Mnich's ability during the introduction phase."""
     log_info("Get data for Mnich introduction.")
     player_character = current_player.character
+    if current_player.drunk:
+        player_character = current_player.additional_characters[0]
 
     return {
         "screen": "players_introduction",
@@ -55,6 +57,8 @@ def render_night_action(game_engine, current_player):
             )
     log_info(f"Player list for Mnich's ability effect: {player_list}")
     player_character = current_player.character
+    if current_player.drunk:
+        player_character = current_player.additional_characters[0]
 
     return {
         "screen": "night_mnich",
@@ -74,6 +78,8 @@ def render_night_resolution(game_engine, current_player):
     """Effect of the Mnich's ability during night_all_players_action state."""
     log_info("Get data for Mnich night resolution.")
     player_character = current_player.character
+    if current_player.drunk:
+        player_character = current_player.additional_characters[0]
 
     # Pobierz gracza chronionego przez Mnicha z game_state
     protected_player = game_engine.game_state.player_protected_by_mnich
@@ -156,6 +162,7 @@ ability.callback_mnich = DualEffect(
 render_page = RenderPage(
     introduction=DualEffect(
         original=render_introduction,
+        fake=render_introduction,
     ),
     night_action=DualEffect(
         original=render_night_action,

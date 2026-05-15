@@ -9,6 +9,8 @@ def render_introduction(game_engine, current_player):
     """Render effect of the Zolnierz's ability during the introduction phase."""
     log_info("Get data for Zolnierz introduction.")
     player_character = current_player.character
+    if current_player.drunk:
+        player_character = current_player.additional_characters[0]
 
     return {
         "screen": "players_introduction",
@@ -32,6 +34,8 @@ def render_night_action(game_engine, current_player):
         screen_content = "action_completed"
         player_status = "Potwierdziłeś swoją nocną akcję lub ona nie działa."
     player_character = current_player.character
+    if current_player.drunk:
+        player_character = current_player.additional_characters[0]
 
     return {
         "screen": "night_basic",
@@ -50,6 +54,8 @@ def render_night_resolution(game_engine, current_player):
     """Effect of the Zolnierz's ability during night_all_players_action state."""
     log_info("Get data for Zolnierz night resolution.")
     player_character = current_player.character
+    if current_player.drunk:
+        player_character = current_player.additional_characters[0]
 
     return {
         "screen": "night_basic",

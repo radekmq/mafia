@@ -3,16 +3,23 @@
 
 from characters.character import RoleType
 from characters.character_details.baron import BaronCharacter
+from characters.character_details.bibliotekarka import BibliotekarkaCharacter
+from characters.character_details.detektyw import DetektywCharacter
+from characters.character_details.dziewica import DziewicaCharacter
 from characters.character_details.empata import EmpataCharacter
 from characters.character_details.grabarz import GrabarzCharacter
 from characters.character_details.imp import ImpCharacter
 from characters.character_details.jasnowidz import JasnowidzCharacter
 from characters.character_details.krukarz import KrukarzCharacter
+from characters.character_details.kucharz import KucharzCharacter
 from characters.character_details.lokaj import LokajCharacter
 from characters.character_details.mnich import MnichCharacter
 from characters.character_details.pijak import PijakCharacter
+from characters.character_details.praczka import PraczkaCharacter
 from characters.character_details.pustelnik import PustelnikCharacter
+from characters.character_details.skarlet import SkarletCharacter
 from characters.character_details.swiety import SwietyCharacter
+from characters.character_details.truciciel import TrucicielCharacter
 from characters.character_details.zolnierz import ZolnierzCharacter
 from characters.scenario import Scenario
 from logger import log_info
@@ -26,16 +33,17 @@ class TroubleBrewingScenario(Scenario):
         super().__init__()
 
         # ====== MIESZKAŃCY ======
-        # self.add_character(PraczkaCharacter())
-        # self.add_character(BibliotekarkaCharacter())
-        # self.add_character(DetektywCharacter())
-        # self.add_character(KucharzCharacter())
+        self.add_character(PraczkaCharacter())
+        self.add_character(BibliotekarkaCharacter())
+        self.add_character(DetektywCharacter())
+        self.add_character(KucharzCharacter())
         self.add_character(EmpataCharacter())
         self.add_character(JasnowidzCharacter())
         self.add_character(GrabarzCharacter())
         self.add_character(ZolnierzCharacter())
         self.add_character(MnichCharacter())
         self.add_character(KrukarzCharacter())
+        self.add_character(DziewicaCharacter())
 
         # ====== OUTSIDER ======
         self.add_character(PijakCharacter())
@@ -44,8 +52,8 @@ class TroubleBrewingScenario(Scenario):
         self.add_character(PustelnikCharacter())
 
         # ====== MINIONKI ======
-        # self.add_character(TrucicielCharacter())
-        # self.add_character(SkarletCharacter())
+        self.add_character(TrucicielCharacter())
+        self.add_character(SkarletCharacter())
         self.add_character(BaronCharacter())
 
         # ====== DEMONY ======
@@ -76,9 +84,9 @@ class TroubleBrewingScenario(Scenario):
             },
             {
                 "liczba_graczy": 4,
-                "Mieszkańcy": 1,
-                "Outsiderzy": 1,
-                "Minionki": 1,
+                "Mieszkańcy": 3,
+                "Outsiderzy": 0,
+                "Minionki": 0,
                 "Demon": 1,
             },
             # Up to here

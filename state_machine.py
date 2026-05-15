@@ -253,6 +253,11 @@ transitions = [
         "dest": "nomination",
     },
     {
+        "trigger": "virgin_executed",
+        "source": "nomination",
+        "dest": "execution",
+    },
+    {
         "trigger": "next_phase",
         "source": "nomination",
         "dest": "voting",

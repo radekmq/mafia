@@ -333,6 +333,7 @@ ability.callback_i_see_you = DualEffect(
 render_page = RenderPage(
     introduction=DualEffect(
         original=render_introduction,
+        fake=render_introduction,
     ),
     night_action=DualEffect(
         original=render_night_action,

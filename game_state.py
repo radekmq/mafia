@@ -74,6 +74,7 @@ class GameState:
         self.winning_team = None
         self.last_day_voting_snapshot = []
         self.player_protected_by_mnich = None
+        self.executed_by_virgin = None
 
     # =========================
     # FUNCTIONS OPERATING ON GAME STATE
@@ -151,6 +152,7 @@ class GameState:
             self.winning_team = None
             self.last_day_voting_snapshot = []
             self.game_over_conditions_met = False
+            self.executed_by_virgin = None
             for player in self.players:
                 player.reset_status()
             # Reset also the scenario setup (characters pool)
@@ -463,3 +465,20 @@ class GameState:
         """Increment day counter."""
         with self.lock:
             self.day += 1
+
+    def set_executed_by_virgin(self, player: Player | None):
+        """Set executed by Virgin."""
+        log_info(f"Setting executed by Virgin: {player.name if player else 'None'}")
+        with self.lock:
+            self.executed_by_virgin = player
+
+    def reset_executed_by_virgin(self):
+        """Reset executed by Virgin."""
+        log_info("Resetting executed by Virgin.")
+        with self.lock:
+            self.executed_by_virgin = None
+
+    def get_executed_by_virgin(self) -> Player | None:
+        """Get executed by Virgin."""
+        with self.lock:
+            return self.executed_by_virgin

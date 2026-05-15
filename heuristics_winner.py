@@ -106,6 +106,8 @@ class WinnerHeuristic:
 
             if hasattr(player.character, "evaluate_knowledge_score"):
                 knowledge = player.character.evaluate_knowledge_score(player)
+                if knowledge is None:
+                    knowledge = 0.0
                 power = self.character_power.get(player.character.name, 1)
                 log_info(
                     f"[WinnerHeuristic] Evaluating good knowledge for {player.character.name}: {knowledge} (power: {power})"

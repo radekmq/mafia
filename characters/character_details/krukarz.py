@@ -12,6 +12,8 @@ def render_introduction(game_engine, current_player):
     """Render effect of the Krukarz's ability during the introduction phase."""
     log_info("Get data for Krukarz introduction.")
     player_character = current_player.character
+    if current_player.drunk:
+        player_character = current_player.additional_characters[0]
 
     return {
         "screen": "players_introduction",
@@ -28,6 +30,8 @@ def render_night_action(game_engine, current_player):
     """Render effect of the Krukarz's ability during the night action phase."""
     log_info("Krukarz's ability effect for night_minion_action called.")
     player_character = current_player.character
+    if current_player.drunk:
+        player_character = current_player.additional_characters[0]
 
     krukarz_status = "Już wykonałeś swoją nocną akcję!"
     if current_player.is_night_action_done() or not current_player.is_alive():
@@ -70,6 +74,8 @@ def render_night_resolution(game_engine, current_player):
     """Effect of the Krukarz's ability during night_all_players_action state."""
     log_info("Get data for Krukarz night resolution.")
     player_character = current_player.character
+    if current_player.drunk:
+        player_character = current_player.additional_characters[0]
 
     return {
         "screen": "night_basic",
@@ -237,6 +243,7 @@ ability.callback_krukarz = DualEffect(
 render_page = RenderPage(
     introduction=DualEffect(
         original=render_introduction,
+        fake=render_introduction,
     ),
     night_action=DualEffect(
         original=render_night_action,

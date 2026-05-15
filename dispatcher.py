@@ -114,11 +114,25 @@ class Dispatcher:
             selected_player = self.game_state.get_player_by_client_id(
                 selected_player_id
             )
+
+            virgin_nominated_firs_time_by_townsfolk = False
+            if hasattr(selected_player.character, "on_virgin_nomination"):
+                virgin_nominated_firs_time_by_townsfolk = (
+                    selected_player.character.on_virgin_nomination(
+                        selected_player, current_player
+                    )
+                )
+
             selected_player.set_nominated_for_execution(True)
             self.game_state.set_active_nominee_for_execution(selected_player)
             self.game_state.set_active_nominator(current_player)
             self.game_state.set_voting_order(current_player.seat_no)
-            self.state_machine.next_phase()
+
+            if virgin_nominated_firs_time_by_townsfolk:
+                self.game_state.set_executed_by_virgin(current_player)
+                self.state_machine.virgin_executed()
+            else:
+                self.state_machine.next_phase()
 
         elif event.name == "vote_execute":
             current_player = self.game_state.get_player_by_client_id(event.actor_id)
@@ -391,7 +405,18 @@ class Dispatcher:
                 new_events.append(update_state_view(voter, voting_data))
 
         elif event.name == "enter_day_execution":
-            player_winner = self.game_state.get_player_with_most_votes()
+            nominated_players = []
+            executed_by_virgin = self.game_state.get_executed_by_virgin()
+            if executed_by_virgin:
+                log_info(
+                    f"Player executed by Dziewica's ability: {executed_by_virgin.name} (client_id: {executed_by_virgin.client_id})"
+                )
+                player_winner = executed_by_virgin
+                self.game_state.reset_executed_by_virgin()
+            else:
+                player_winner = self.game_state.get_player_with_most_votes()
+                nominated_players = self.game_state.get_nominated_players_dict()
+
             if player_winner:
                 player_winner.player_execution()
                 self.game_state.set_last_executed_player(player_winner)
@@ -408,7 +433,6 @@ class Dispatcher:
                 )
                 log_info("No player was executed due to a tie or no votes.")
 
-            nominated_players = self.game_state.get_nominated_players_dict()
             log_info(f"Nominated players for execution: {nominated_players}")
             self.game_state.capture_last_day_voting_snapshot()
             self.game_state.reset_voting_statuses()
@@ -527,6 +551,7 @@ class Dispatcher:
                 new_events.extend(events)
 
         elif event.name == "lokaj_night_choice":
+            log_info("Processing Lokaj's night choice event.")
             player = self.game_state.get_player_by_client_id(event.actor_id)
             data = {
                 "actor": player,
